@@ -1,10 +1,9 @@
 [build]
 builder = "RAILPACK"
-buildCommand = "npm ci && npm run build"
 watchPatterns = ["/admin/**"]
 
 [deploy]
-startCommand = "npm run start"
+startCommand = "node server.js"
 healthcheckPath = "/login"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
