@@ -1,0 +1,28 @@
+name: ludo_champion
+version: 1.1.0+4
+publish_to: "none"
+description: MAURITANIA LUDO connected mobile application.
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  image_picker: ^1.1.2
+  shared_preferences: ^2.3.5
+  http: ^1.6.0
+  flutter_secure_storage: ^10.3.1
+  socket_io_client: ^3.1.6
+  url_launcher: ^6.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/branding/

@@ -1,0 +1,640 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  PLAYER
+  SUPPORT
+  MODERATOR
+  FINANCE
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  DELETED
+}
+
+enum WalletType {
+  CASH
+  BONUS
+  COINS
+  GEMS
+  LOCKED
+}
+
+enum LedgerDirection {
+  CREDIT
+  DEBIT
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  ADMIN_ADJUSTMENT
+  WAGER_LOCK
+  WAGER_RELEASE
+  MATCH_PRIZE
+  PLATFORM_FEE
+  REFUND
+  STORE_PURCHASE
+  REWARD
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELLED
+  REFUNDED
+}
+
+enum MatchMode {
+  PRACTICE
+  CASUAL
+  WAGER
+  PRIVATE
+  TOURNAMENT
+}
+
+enum MatchStatus {
+  WAITING
+  READY
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum MatchPlayerStatus {
+  INVITED
+  JOINED
+  READY
+  ACTIVE
+  FINISHED
+  FORFEITED
+  TIMED_OUT
+  DISCONNECTED
+}
+
+enum MatchEventType {
+  MATCH_CREATED
+  PLAYER_JOINED
+  PLAYER_READY
+  MATCH_STARTED
+  DICE_ROLLED
+  PIECE_MOVED
+  PIECE_CAPTURED
+  PIECE_FINISHED
+  TURN_TIMED_OUT
+  PLAYER_RECONNECTED
+  PLAYER_FORFEITED
+  MATCH_COMPLETED
+  MATCH_CANCELLED
+  WAGER_LOCKED
+  WAGER_SETTLED
+  WAGER_REFUNDED
+}
+
+enum PlayerColor {
+  RED
+  GREEN
+  YELLOW
+  BLUE
+}
+
+enum MatchmakingStatus {
+  SEARCHING
+  MATCHED
+  CANCELLED
+  EXPIRED
+}
+
+
+enum CatalogItemType {
+  BOARD
+  DICE
+  DICE_FRAME
+  BACKGROUND
+  AVATAR_FRAME
+  EMOTE
+  SKILL
+  COIN_PACK
+  GEM_PACK
+}
+
+enum CatalogRarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+  LIMITED
+}
+
+enum CatalogStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum InventorySource {
+  PURCHASE
+  REWARD
+  ADMIN_GRANT
+  DEFAULT
+}
+
+enum CampaignSurface {
+  APP_BACKGROUND
+  HOME_BANNER
+  STORE_BANNER
+  GAME_LOBBY
+}
+
+enum PaymentProvider {
+  MANUAL
+  MOOSYL
+  CUSTOM
+}
+
+enum PaymentMethodStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum PaymentIntentStatus {
+  CREATED
+  PENDING
+  SUCCEEDED
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+enum NotificationType {
+  SYSTEM
+  MATCH
+  WALLET
+  TOURNAMENT
+  SOCIAL
+}
+
+model User {
+  id              String           @id @default(uuid()) @db.Uuid
+  email           String?          @unique
+  phone           String?          @unique
+  username        String           @unique
+  passwordHash    String
+  status          UserStatus       @default(ACTIVE)
+  roles           Role[]           @default([PLAYER])
+  preferredLocale String           @default("ar")
+  lastLoginAt     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  profile         UserProfile?
+  sessions        RefreshSession[]
+  walletAccounts  WalletAccount[]
+  ledgerEntries   LedgerEntry[]
+  transactions    FinancialTransaction[]
+  matchPlayers    MatchPlayer[]
+  tickets         MatchmakingTicket[]
+  notifications   Notification[]
+  uploads         UploadedFile[]
+  inventory       UserInventory[]
+  storePurchases  StorePurchase[]
+  paymentIntents  PaymentIntent[]
+  adminActions    AuditLog[]       @relation("AdminActor")
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model UserProfile {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @db.Uuid
+  displayName String
+  avatarUrl   String?
+  countryCode String?
+  bio         String?
+  level       Int      @default(1)
+  xp          Int      @default(0)
+  wins        Int      @default(0)
+  losses      Int      @default(0)
+  matches     Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RefreshSession {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  tokenHash    String
+  deviceId     String?
+  deviceName   String?
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  lastUsedAt   DateTime?
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model WalletAccount {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @db.Uuid
+  type      WalletType
+  currency  String     @default("MRU")
+  balance   Decimal    @default(0) @db.Decimal(20, 4)
+  version   Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries   LedgerEntry[]
+
+  @@unique([userId, type, currency])
+  @@index([userId])
+}
+
+model FinancialTransaction {
+  id            String            @id @default(uuid()) @db.Uuid
+  userId        String            @db.Uuid
+  type          TransactionType
+  status        TransactionStatus @default(PENDING)
+  amount        Decimal           @db.Decimal(20, 4)
+  fee           Decimal           @default(0) @db.Decimal(20, 4)
+  currency      String            @default("MRU")
+  externalRef   String?
+  idempotencyKey String?          @unique
+  description   String?
+  metadata      Json?
+  processedAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  user          User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  ledgerEntries LedgerEntry[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model LedgerEntry {
+  id             String               @id @default(uuid()) @db.Uuid
+  userId         String               @db.Uuid
+  accountId      String               @db.Uuid
+  transactionId  String?              @db.Uuid
+  direction      LedgerDirection
+  amount         Decimal              @db.Decimal(20, 4)
+  balanceBefore  Decimal              @db.Decimal(20, 4)
+  balanceAfter   Decimal              @db.Decimal(20, 4)
+  referenceType  String?
+  referenceId    String?
+  description    String?
+  metadata       Json?
+  createdAt      DateTime             @default(now())
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  account        WalletAccount        @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  transaction    FinancialTransaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([accountId, createdAt])
+  @@index([referenceType, referenceId])
+}
+
+model GameRuleSet {
+  id                    String    @id @default(uuid()) @db.Uuid
+  code                  String    @unique
+  name                  String
+  descriptionAr         String?
+  descriptionEn         String?
+  sortOrder             Int       @default(0)
+  piecesPerPlayer       Int       @default(4)
+  requiresSixToExit     Boolean   @default(true)
+  extraTurnOnSix        Boolean   @default(true)
+  extraTurnOnCapture    Boolean   @default(true)
+  extraTurnOnFinish     Boolean   @default(false)
+  threeSixesLoseTurn    Boolean   @default(true)
+  exactRollToFinish     Boolean   @default(true)
+  blockadeEnabled       Boolean   @default(true)
+  rollSeconds           Int       @default(12)
+  moveSeconds           Int       @default(15)
+  maxInactiveTurns      Int       @default(3)
+  reconnectSeconds      Int       @default(30)
+  finishAllPlayers      Boolean   @default(false)
+  enabled               Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  matches               Match[]
+}
+
+model Match {
+  id              String          @id @default(uuid()) @db.Uuid
+  publicCode      String          @unique
+  mode            MatchMode
+  status          MatchStatus     @default(WAITING)
+  maxPlayers      Int
+  stakeAmount     Decimal         @default(0) @db.Decimal(20, 4)
+  currency        String          @default("MRU")
+  platformFeeRate Decimal         @default(0) @db.Decimal(8, 6)
+  ruleSetId       String          @db.Uuid
+  currentState    Json?
+  stateVersion    Int             @default(0)
+  winnerUserId    String?         @db.Uuid
+  nextActionAt    DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  ruleSet         GameRuleSet     @relation(fields: [ruleSetId], references: [id], onDelete: Restrict)
+  players         MatchPlayer[]
+  events          MatchEvent[]
+  tickets         MatchmakingTicket[]
+
+  @@index([status, nextActionAt])
+  @@index([mode, status, createdAt])
+}
+
+model MatchPlayer {
+  id               String            @id @default(uuid()) @db.Uuid
+  matchId          String            @db.Uuid
+  userId           String            @db.Uuid
+  color            PlayerColor?
+  seat              Int
+  status            MatchPlayerStatus @default(JOINED)
+  inactiveTurns     Int               @default(0)
+  finishPosition    Int?
+  joinedAt          DateTime          @default(now())
+  readyAt           DateTime?
+  finishedAt        DateTime?
+  match             Match             @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user              User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([matchId, userId])
+  @@unique([matchId, seat])
+  @@index([userId, joinedAt])
+}
+
+model MatchEvent {
+  id          BigInt         @id @default(autoincrement())
+  matchId     String         @db.Uuid
+  actorUserId String?        @db.Uuid
+  type        MatchEventType
+  sequence    Int
+  payload     Json?
+  createdAt   DateTime       @default(now())
+  match       Match          @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, sequence])
+  @@index([matchId, createdAt])
+}
+
+model MatchmakingTicket {
+  id          String             @id @default(uuid()) @db.Uuid
+  userId      String             @db.Uuid
+  matchId     String?            @db.Uuid
+  mode        MatchMode
+  maxPlayers  Int
+  stakeAmount Decimal            @default(0) @db.Decimal(20, 4)
+  currency    String             @default("MRU")
+  ruleCode    String
+  status      MatchmakingStatus  @default(SEARCHING)
+  expiresAt   DateTime
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match       Match?             @relation(fields: [matchId], references: [id], onDelete: SetNull)
+
+  @@index([status, mode, maxPlayers, stakeAmount, ruleCode])
+  @@index([userId, status])
+}
+
+
+model CatalogItem {
+  id             String          @id @default(uuid()) @db.Uuid
+  code           String          @unique
+  type           CatalogItemType
+  nameAr         String
+  nameEn         String
+  descriptionAr  String?
+  descriptionEn  String?
+  imageUrl       String?
+  previewUrl     String?
+  price          Decimal         @default(0) @db.Decimal(20, 4)
+  priceWallet    WalletType      @default(COINS)
+  minLevel       Int             @default(1)
+  rarity         CatalogRarity   @default(COMMON)
+  status         CatalogStatus   @default(DRAFT)
+  isFeatured     Boolean         @default(false)
+  isDefault      Boolean         @default(false)
+  sortOrder      Int             @default(0)
+  metadata       Json?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  inventory      UserInventory[]
+  purchases      StorePurchase[]
+
+  @@index([type, status, sortOrder])
+  @@index([isFeatured, status])
+}
+
+model UserInventory {
+  id          String          @id @default(uuid()) @db.Uuid
+  userId      String          @db.Uuid
+  itemId      String          @db.Uuid
+  source      InventorySource
+  quantity    Int             @default(1)
+  equipped    Boolean         @default(false)
+  acquiredAt  DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item        CatalogItem     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId])
+  @@index([userId, equipped])
+}
+
+model StorePurchase {
+  id            String       @id @default(uuid()) @db.Uuid
+  userId        String       @db.Uuid
+  itemId        String       @db.Uuid
+  transactionId String?      @db.Uuid
+  price         Decimal      @db.Decimal(20, 4)
+  walletType    WalletType
+  quantity      Int          @default(1)
+  createdAt     DateTime     @default(now())
+  user          User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  item          CatalogItem  @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@index([itemId, createdAt])
+}
+
+model LevelDefinition {
+  level          Int      @id
+  xpRequired     Int
+  titleAr        String
+  titleEn        String
+  badgeUrl       String?
+  rewards        Json?
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+
+model StageDefinition {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique
+  nameAr      String
+  nameEn      String
+  minLevel    Int
+  maxLevel    Int?
+  imageUrl    String?
+  colorHex    String?
+  rewards     Json?
+  enabled     Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([enabled, sortOrder, minLevel])
+}
+
+model ThemeCampaign {
+  id              String          @id @default(uuid()) @db.Uuid
+  code            String          @unique
+  surface         CampaignSurface
+  nameAr          String
+  nameEn          String
+  imageUrl        String?
+  backgroundColor String?
+  textColor       String?
+  actionType      String?
+  actionValue     String?
+  startsAt        DateTime?
+  endsAt          DateTime?
+  enabled         Boolean         @default(true)
+  priority        Int             @default(0)
+  metadata        Json?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([surface, enabled, priority])
+  @@index([startsAt, endsAt])
+}
+
+model PaymentMethod {
+  id                 String              @id @default(uuid()) @db.Uuid
+  code               String              @unique
+  provider           PaymentProvider
+  nameAr             String
+  nameEn             String
+  status             PaymentMethodStatus @default(INACTIVE)
+  supportsDeposit    Boolean             @default(true)
+  supportsWithdrawal Boolean             @default(false)
+  currency           String              @default("MRU")
+  minAmount          Decimal             @default(0) @db.Decimal(20, 4)
+  maxAmount          Decimal             @default(100000) @db.Decimal(20, 4)
+  feeFixed           Decimal             @default(0) @db.Decimal(20, 4)
+  feeRate            Decimal             @default(0) @db.Decimal(8, 6)
+  iconUrl            String?
+  publicConfig       Json?
+  secretEnvPrefix    String?
+  sortOrder          Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  intents            PaymentIntent[]
+
+  @@index([status, supportsDeposit, sortOrder])
+}
+
+model PaymentIntent {
+  id             String              @id @default(uuid()) @db.Uuid
+  userId         String              @db.Uuid
+  methodId       String              @db.Uuid
+  transactionId  String?             @db.Uuid
+  providerRef    String?
+  status         PaymentIntentStatus @default(CREATED)
+  amount         Decimal             @db.Decimal(20, 4)
+  fee            Decimal             @default(0) @db.Decimal(20, 4)
+  currency       String              @default("MRU")
+  checkoutUrl    String?
+  metadata       Json?
+  expiresAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  user           User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  method         PaymentMethod       @relation(fields: [methodId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([providerRef])
+}
+
+model AppSetting {
+  key         String   @id
+  value       Json
+  description String?
+  isPublic    Boolean  @default(false)
+  updatedBy   String?  @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+model UploadedFile {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  storageKey   String   @unique
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  publicUrl    String
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  actorUserId String?  @db.Uuid
+  action      String
+  entityType  String
+  entityId    String?
+  before      Json?
+  after       Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation("AdminActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId])
+}

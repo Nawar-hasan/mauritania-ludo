@@ -1,0 +1,38 @@
+# Secrets
+.env
+.env.*
+!.env.example
+backend/.env
+admin/.env.local
+
+# Node
+**/node_modules/
+**/dist/
+**/.next/
+**/coverage/
+
+# Flutter / Dart
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins-dependencies
+mobile/.pub-cache/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
+
+# Local persistent/runtime files
+backend/uploads/
+backups/
+*.sql
+
+# Release signing secrets - NEVER COMMIT
+mobile/android/key.properties
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+AuthKey_*.p8

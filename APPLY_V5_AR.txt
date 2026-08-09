@@ -1,0 +1,13 @@
+1) أغلق نوافذ تشغيل backend و admin فقط.
+2) انسخ محتويات هذا المجلد إلى C:\ludo_platform_v3_connected واختر Replace.
+3) افتح PowerShell داخل C:\ludo_platform_v3_connected
+4) نفذ:
+   Set-ExecutionPolicy -Scope Process Bypass
+   Unblock-File .\apply_v5_connected_flow.ps1
+   Unblock-File .\test_v5_connected_flow.ps1
+   .\apply_v5_connected_flow.ps1
+5) بعد ظهور V5 APPLY COMPLETE شغّل:
+   .\start_all_windows.bat
+6) بعد أن تعمل لوحة التحكم وSwagger نفذ في PowerShell آخر:
+   .\test_v5_connected_flow.ps1
+7) عند ظهور V5 CONNECTED FLOW PASSED يكون المسار الأساسي كله متصلاً.

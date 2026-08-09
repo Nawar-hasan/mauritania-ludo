@@ -1,0 +1,1 @@
+module.exports = { extensionsToTreatAsEsm: ['.ts'], moduleFileExtensions: ['js','json','ts'], rootDir: 'src', testRegex: '.*\\.spec\\.ts$', transform: { '^.+\\.ts$': ['ts-jest', { useESM: true, tsconfig: 'tsconfig.json' }] }, moduleNameMapper: { '^(\\.{1,2}/.*)\\.js$': '$1' }, coverageDirectory: '../coverage', testEnvironment: 'node' };

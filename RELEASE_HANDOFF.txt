@@ -1,0 +1,7 @@
+MAURITANIA LUDO cloud handoff
+1) Read DEPLOY_GITHUB_RAILWAY_CLIENT_AR.md
+2) Push this whole folder to a PRIVATE GitHub repo.
+3) Railway: Postgres + Redis + Backend(/backend) + Admin(/admin).
+4) Add Backend Volume at /app/uploads.
+5) Build Android from release_tools/build_android_from_railway.ps1.
+6) iOS/TestFlight requires macOS + Xcode + Apple Developer signing.

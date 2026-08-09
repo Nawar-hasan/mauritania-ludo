@@ -1,0 +1,3 @@
+'use client';
+import { useEffect,useState } from 'react';import { Shell } from '@/components/shell';import { api } from '@/lib/api';
+export default function Audit(){const[items,setItems]=useState<any[]>([]);useEffect(()=>{api<any>('/admin/audit-logs').then(x=>setItems(x.items))},[]);return <Shell><h1>Audit log</h1><table className="table"><thead><tr><th>Actor</th><th>Action</th><th>Entity</th><th>Date</th></tr></thead><tbody>{items.map(x=><tr key={x.id}><td>{x.actor?.username??'system'}</td><td>{x.action}</td><td>{x.entityType} {x.entityId}</td><td>{new Date(x.createdAt).toLocaleString()}</td></tr>)}</tbody></table></Shell>}

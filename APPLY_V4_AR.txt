@@ -1,0 +1,29 @@
+ترقية Ludo Champion V4
+======================
+
+1) أغلق نوافذ PowerShell التي تشغّل Backend وAdmin.
+2) انسخ محتويات ملف الترقية إلى:
+   C:\ludo_platform_v3_connected
+   واختر Replace the files in the destination.
+3) افتح PowerShell داخل نفس المجلد ونفّذ كل أمر لوحده:
+
+Set-ExecutionPolicy -Scope Process Bypass
+Unblock-File .\apply_v4_commerce_upgrade.ps1
+.\apply_v4_commerce_upgrade.ps1
+
+4) انتظر حتى يظهر:
+   V4 UPGRADE COMPLETE
+
+5) شغّل النظام:
+   .\start_all_windows.bat
+
+6) افتح لوحة التحكم:
+   http://localhost:3001
+
+7) لبناء APK متصل بالكمبيوتر:
+   .\build_mobile_for_phone_windows.bat
+
+مهم:
+- السكربت يأخذ نسخة احتياطية من PostgreSQL قبل الترحيل.
+- لا يمسح المستخدمين أو المحافظ أو المباريات الحالية.
+- لا تفعّل الدفع الإلكتروني قبل إضافة بيانات تاجر اختبار رسمية.
