@@ -1,10 +1,10 @@
-[build]
+﻿[build]
 builder = "RAILPACK"
 buildCommand = "npm ci && npm run db:generate && npm run build"
 watchPatterns = ["/backend/**"]
 
 [deploy]
-preDeployCommand = ["npx prisma migrate deploy && npm run db:seed"]
+preDeployCommand = ["npm run db:prepare"]
 startCommand = "npm run start:prod"
 healthcheckPath = "/api/v1/health"
 healthcheckTimeout = 120
