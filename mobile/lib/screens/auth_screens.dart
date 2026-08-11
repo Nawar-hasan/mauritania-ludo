@@ -323,6 +323,8 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           const SizedBox(height: 18),
           GoldButton(label: 'Log In', icon: Icons.login_rounded, loading: controller.busy, onPressed: controller.busy ? null : _submit),
+          const SizedBox(height: 10),
+          PurpleButton(label: 'Play Offline', icon: Icons.offline_bolt_rounded, onPressed: () => Navigator.pushNamed(context, Routes.offlineMode)),
           const SizedBox(height: 22),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,

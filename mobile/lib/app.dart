@@ -4,6 +4,7 @@ import 'core/app_theme.dart';
 import 'core/routes.dart';
 import 'screens/auth_screens.dart';
 import 'screens/game_screens.dart';
+import 'screens/local_game_screen.dart';
 import 'screens/remote_game_screen.dart';
 import 'screens/home_screens.dart';
 import 'screens/profile_screens.dart';
@@ -69,6 +70,8 @@ class _LudoChampionAppState extends State<LudoChampionApp> {
       Routes.shell => const MainShellScreen(),
       Routes.notifications => const NotificationsScreen(),
       Routes.playModes => const PlayModesScreen(),
+      Routes.offlineMode => const OfflineModeScreen(),
+      Routes.localGame => const LocalLudoGameScreen(),
       Routes.playerCount => const PlayerCountScreen(),
       Routes.rules => const RulesScreen(),
       Routes.wager => const WagerSelectionScreen(),

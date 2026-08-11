@@ -75,7 +75,8 @@ export class MatchesService {
     const rules = await this.prisma.gameRuleSet.findUnique({ where: { code: dto.ruleCode } });
     if (!rules?.enabled) throw new BadRequestException('Rule set unavailable');
     const stake = dto.mode === MatchMode.WAGER || dto.mode === MatchMode.PRIVATE ? Number(dto.stakeAmount ?? 0) : 0;
-    if (stake > 0) await this.validateStake(stake);
+    if (dto.mode === MatchMode.WAGER && stake <= 0) throw new BadRequestException('A wager match requires a positive stake');
+    if (stake > 0) { await this.validateStake(stake); await this.ensureStakeAvailable(userId, stake); }
     const fee = await this.settingNumber('platform_fee_rate', 0.05);
     return this.prisma.$transaction(async (tx) => {
       const match = await tx.match.create({ data: {
@@ -231,7 +232,8 @@ export class MatchesService {
     if (existing) return existing;
 
     const stake = dto.mode === MatchMode.WAGER ? dto.stakeAmount ?? 0 : 0;
-    if (stake > 0) await this.validateStake(stake);
+    if (dto.mode === MatchMode.WAGER && stake <= 0) throw new BadRequestException('A wager match requires a positive stake');
+    if (stake > 0) { await this.validateStake(stake); await this.ensureStakeAvailable(userId, stake); }
     const ticket = await this.prisma.matchmakingTicket.create({
       data: {
         userId,
@@ -562,6 +564,12 @@ export class MatchesService {
         data: { referenceType, referenceId, rewards } as Prisma.InputJsonValue,
       },
     });
+  }
+
+  private async ensureStakeAvailable(userId: string, stakeInput: number) {
+    const stake = new Prisma.Decimal(stakeInput);
+    const cash = await this.prisma.walletAccount.findUnique({ where: { userId_type_currency: { userId, type: WalletType.CASH, currency: 'MRU' } } });
+    if (!cash || cash.balance.lessThan(stake)) throw new BadRequestException('Insufficient cash balance for this wager');
   }
 
   private async reserveStake(tx: Prisma.TransactionClient, userId: string, stakeInput: number, matchId: string) {

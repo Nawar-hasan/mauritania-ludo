@@ -181,6 +181,22 @@ enum PaymentIntentStatus {
   CANCELLED
 }
 
+enum SocialRoomType {
+  TEXT
+  VOICE
+}
+
+enum SocialRoomVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum SocialRoomMemberRole {
+  HOST
+  MODERATOR
+  MEMBER
+}
+
 enum NotificationType {
   SYSTEM
   MATCH
@@ -213,6 +229,9 @@ model User {
   inventory       UserInventory[]
   storePurchases  StorePurchase[]
   paymentIntents  PaymentIntent[]
+  socialRoomsOwned SocialRoom[]       @relation("SocialRoomOwner")
+  socialMemberships SocialRoomMember[]
+  socialMessages    SocialMessage[]
   adminActions    AuditLog[]       @relation("AdminActor")
 
   @@index([status])
@@ -584,6 +603,53 @@ model PaymentIntent {
   @@index([userId, createdAt])
   @@index([status, createdAt])
   @@index([providerRef])
+}
+
+model SocialRoom {
+  id                String               @id @default(uuid()) @db.Uuid
+  name              String
+  description       String?
+  type              SocialRoomType       @default(TEXT)
+  visibility        SocialRoomVisibility @default(PUBLIC)
+  ownerUserId       String               @db.Uuid
+  maxParticipants   Int                  @default(12)
+  active            Boolean              @default(true)
+  voiceProviderRoom String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  owner             User                 @relation("SocialRoomOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  members           SocialRoomMember[]
+  messages          SocialMessage[]
+
+  @@index([active, type, createdAt])
+  @@index([ownerUserId, createdAt])
+}
+
+model SocialRoomMember {
+  id        String               @id @default(uuid()) @db.Uuid
+  roomId    String               @db.Uuid
+  userId    String               @db.Uuid
+  role      SocialRoomMemberRole @default(MEMBER)
+  muted     Boolean              @default(false)
+  joinedAt  DateTime             @default(now())
+  room      SocialRoom           @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([userId, joinedAt])
+}
+
+model SocialMessage {
+  id        String     @id @default(uuid()) @db.Uuid
+  roomId    String     @db.Uuid
+  userId    String     @db.Uuid
+  text      String
+  createdAt DateTime   @default(now())
+  room      SocialRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model AppSetting {

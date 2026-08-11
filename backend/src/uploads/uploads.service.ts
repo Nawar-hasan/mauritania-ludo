@@ -26,8 +26,12 @@ export class UploadsService {
 
   private async save(userId: string, file: Express.Multer.File | undefined, folder: string) {
     if (!file) throw new BadRequestException('File is required');
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
-      throw new BadRequestException('Only JPEG, PNG and WEBP are allowed');
+    const detectedMime = this.detectImageMime(file.buffer);
+    const mimeType = ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)
+      ? file.mimetype
+      : detectedMime;
+    if (!mimeType || !detectedMime || mimeType !== detectedMime) {
+      throw new BadRequestException('Only valid JPEG, PNG and WEBP images are allowed');
     }
     const max = Number(process.env.MAX_UPLOAD_BYTES ?? 5_242_880);
     if (file.size > max) throw new BadRequestException('File is too large');
@@ -44,10 +48,17 @@ export class UploadsService {
         userId,
         storageKey,
         originalName: file.originalname,
-        mimeType: file.mimetype,
+        mimeType,
         sizeBytes: file.size,
         publicUrl,
       },
     });
   }
+  private detectImageMime(buffer: Buffer): 'image/jpeg' | 'image/png' | 'image/webp' | null {
+    if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+    if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))) return 'image/png';
+    if (buffer.length >= 12 && buffer.subarray(0,4).toString('ascii') === 'RIFF' && buffer.subarray(8,12).toString('ascii') === 'WEBP') return 'image/webp';
+    return null;
+  }
+
 }

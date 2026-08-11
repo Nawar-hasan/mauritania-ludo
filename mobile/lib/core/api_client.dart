@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'api_config.dart';
 import 'session_store.dart';
@@ -54,8 +54,6 @@ class ApiClient {
       return _decode(response);
     } on TimeoutException {
       throw const ApiException('NETWORK_TIMEOUT');
-    } on SocketException {
-      throw const ApiException('NETWORK_UNREACHABLE');
     } on http.ClientException {
       throw const ApiException('NETWORK_UNREACHABLE');
     }
@@ -101,8 +99,33 @@ class ApiClient {
       return (_decode(response) as Map).cast<String, dynamic>();
     } on TimeoutException {
       throw const ApiException('NETWORK_TIMEOUT');
-    } on SocketException {
+    } on http.ClientException {
       throw const ApiException('NETWORK_UNREACHABLE');
+    }
+  }
+
+
+  Future<Map<String, dynamic>> uploadBytes(
+    String path,
+    Uint8List bytes,
+    String filename, {
+    String field = 'file',
+    bool retryAfterRefresh = true,
+  }) async {
+    try {
+      final token = await _store.accessToken;
+      final request = http.MultipartRequest('POST', Uri.parse('${ApiConfig.baseUrl}$path'));
+      request.headers['Accept'] = 'application/json';
+      if (token != null && token.isNotEmpty) request.headers['Authorization'] = 'Bearer $token';
+      request.files.add(http.MultipartFile.fromBytes(field, bytes, filename: filename));
+      final streamed = await request.send().timeout(uploadTimeout);
+      final response = await http.Response.fromStream(streamed);
+      if (response.statusCode == 401 && retryAfterRefresh && await _refreshAccessToken()) {
+        return uploadBytes(path, bytes, filename, field: field, retryAfterRefresh: false);
+      }
+      return (_decode(response) as Map).cast<String, dynamic>();
+    } on TimeoutException {
+      throw const ApiException('NETWORK_TIMEOUT');
     } on http.ClientException {
       throw const ApiException('NETWORK_UNREACHABLE');
     }

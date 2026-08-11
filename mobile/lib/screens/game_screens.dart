@@ -13,7 +13,7 @@ class PlayModesScreen extends StatelessWidget {
     OptionTile(icon: Icons.sports_esports_rounded, title: 'Casual Match', subtitle: 'Real server match without reserving wallet funds', color: AppColors.cyan, onTap: () => Navigator.pushNamed(context, Routes.playerCount, arguments: 'casual')),
     OptionTile(icon: Icons.payments_rounded, title: 'Wager Match', subtitle: 'The server reserves the selected amount from every player', color: AppColors.gold, onTap: () => Navigator.pushNamed(context, Routes.playerCount, arguments: 'wager')),
     OptionTile(icon: Icons.key_rounded, title: 'Private Room', subtitle: 'Create a server room or join with its six-digit code', color: AppColors.purpleLight, onTap: () => Navigator.pushNamed(context, Routes.privateRoom)),
-    OptionTile(icon: Icons.smart_toy_outlined, title: 'Practice with Bots', subtitle: 'Disabled until the bot service uses the same authoritative game engine', onTap: () => _notConnected(context)),
+    OptionTile(icon: Icons.offline_bolt_rounded, title: 'Offline / Solo Play', subtitle: 'Play locally against computer players with no internet and no wager', color: AppColors.cyan, onTap: () => Navigator.pushNamed(context, Routes.offlineMode)),
     OptionTile(icon: Icons.emoji_events_outlined, title: 'Tournaments', subtitle: 'Disabled until the tournament backend is connected', color: AppColors.orange, onTap: () => Navigator.pushNamed(context, Routes.tournaments)),
   ]));
 }
@@ -24,7 +24,7 @@ class PlayerCountScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final mode = (ModalRoute.of(context)?.settings.arguments as String?) ?? 'casual';
     return AppPage(title: 'Number of Players', child: Column(children: [
-      const ScreenHeader(title: 'Select match size', subtitle: 'Every player must use a separate authenticated account during the connected test.', icon: Icons.groups_rounded),
+      const ScreenHeader(title: 'Select match size', subtitle: 'Online matches use separate authenticated accounts. Offline solo play is available from the game mode menu.', icon: Icons.groups_rounded),
       const SizedBox(height: 24),
       _CountCard(players: 2, onTap: () => Navigator.pushNamed(context, Routes.rules, arguments: {'mode': mode, 'players': 2})),
       const SizedBox(height: 12),

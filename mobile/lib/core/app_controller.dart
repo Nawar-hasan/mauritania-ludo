@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'api_client.dart';
@@ -32,6 +33,7 @@ class AppController extends ChangeNotifier {
   List<Map<String, dynamic>> stages = [];
   List<Map<String, dynamic>> paymentMethods = [];
   List<Map<String, dynamic>> gameRules = [];
+  List<Map<String, dynamic>> socialRooms = [];
 
   double walletBalance = 0;
   double withdrawableBalance = 0;
@@ -188,17 +190,17 @@ class AppController extends ChangeNotifier {
     });
   }
 
-  Future<bool> uploadAvatar(String filePath) {
+  Future<bool> uploadAvatarBytes(Uint8List bytes, String filename) {
     return _run(() async {
-      await api.uploadFile('/users/me/avatar', filePath);
+      await api.uploadBytes('/users/me/avatar', bytes, filename);
       await refreshAll();
     });
   }
 
-  Future<String?> uploadReceipt(String filePath) async {
+  Future<String?> uploadReceiptBytes(Uint8List bytes, String filename) async {
     errorMessage = null;
     try {
-      final result = await api.uploadFile('/users/me/receipt', filePath);
+      final result = await api.uploadBytes('/users/me/receipt', bytes, filename);
       return result['url']?.toString() ?? result['publicUrl']?.toString();
     } catch (error) {
       errorMessage = _message(error);
@@ -304,6 +306,24 @@ class AppController extends ChangeNotifier {
       _run(() async { await api.post('/matches/$id/cancel'); await refreshAll(); });
   Future<bool> leaveWaitingRoom(String id) =>
       _run(() async { await api.post('/matches/$id/leave'); await refreshAll(); });
+
+
+  Future<void> loadSocialRooms() async {
+    final result = await _runValue(() async => await api.get('/social/rooms'));
+    if (result != null) { socialRooms = _items(result); notifyListeners(); }
+  }
+
+  Future<Map<String, dynamic>?> createSocialRoom({required String name, required bool voice, int maxParticipants = 12}) =>
+      _runValue(() async => (await api.post('/social/rooms', body: {'name': name, 'type': voice ? 'VOICE' : 'TEXT', 'visibility': 'PUBLIC', 'maxParticipants': maxParticipants}) as Map).cast<String, dynamic>());
+  Future<Map<String, dynamic>?> getSocialRoom(String id) => _runValue(() async => (await api.get('/social/rooms/$id') as Map).cast<String, dynamic>());
+  Future<Map<String, dynamic>?> joinSocialRoom(String id) => _runValue(() async => (await api.post('/social/rooms/$id/join') as Map).cast<String, dynamic>());
+  Future<bool> leaveSocialRoom(String id) => _run(() async { await api.delete('/social/rooms/$id/leave'); await loadSocialRooms(); });
+  Future<List<Map<String, dynamic>>> socialMessages(String id) async {
+    final result = await _runValue(() async => await api.get('/social/rooms/$id/messages'));
+    return result == null ? <Map<String,dynamic>>[] : _items(result);
+  }
+  Future<Map<String, dynamic>?> sendSocialMessage(String id, String text) => _runValue(() async => (await api.post('/social/rooms/$id/messages', body: {'text': text}) as Map).cast<String, dynamic>());
+  Future<Map<String, dynamic>?> requestVoiceSession(String id) => _runValue(() async => (await api.post('/social/rooms/$id/voice-session') as Map).cast<String, dynamic>());
 
   Future<bool> markNotificationsRead() => _run(() async {
     await api.patch('/notifications/read-all');

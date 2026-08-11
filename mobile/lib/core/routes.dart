@@ -12,6 +12,8 @@ abstract final class Routes {
   static const shell = '/shell';
   static const notifications = '/notifications';
   static const playModes = '/play-modes';
+  static const offlineMode = '/offline-mode';
+  static const localGame = '/local-game';
   static const playerCount = '/player-count';
   static const rules = '/rules';
   static const wager = '/wager';

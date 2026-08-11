@@ -85,7 +85,7 @@ class ProfileScreen extends StatelessWidget {
     final image = await ImagePicker().pickImage(source: source, imageQuality: 82, maxWidth: 1600);
     if (image == null || !context.mounted) return;
     final controller = AppScope.of(context);
-    final ok = await controller.uploadAvatar(image.path);
+    final ok = await controller.uploadAvatarBytes(await image.readAsBytes(), image.name);
     if (!context.mounted) return;
     _message(context, ok ? 'Profile photo updated' : (controller.errorMessage ?? 'Profile photo update failed'));
   }
@@ -301,7 +301,7 @@ class AboutScreen extends StatelessWidget {
   Widget build(BuildContext context) => AppPage(title: 'About', child: Column(children: [
     const ScreenHeader(title: 'MAURITANIA LUDO', subtitle: 'Connected staging build', icon: Icons.casino_rounded),
     const SizedBox(height: 18),
-    GradientPanel(child: Text(context.tr('This build uses real authentication, profile, wallet, payments, store, inventory, appearance, levels, stages, transactions and authoritative match APIs. Tournaments, voice rooms, referrals, achievements and support are the remaining disabled modules.'), textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, height: 1.5))),
+    GradientPanel(child: Text(context.tr('This build uses real authentication, profile, wallet, payments, store, inventory, appearance, levels, stages, transactions, authoritative online matches, cash-wager reservation/settlement, offline practice and server-backed text/voice room structure. Live voice audio still requires the selected voice provider API. Tournaments, referrals, achievements, support and password recovery remain separate modules.'), textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, height: 1.5))),
   ]));
 }
 

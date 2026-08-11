@@ -15,6 +15,7 @@ import { SettingsModule } from './settings/settings.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { CatalogModule } from './catalog/catalog.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
+import { SocialModule } from './social/social.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
 import { validateEnv } from './config/env.js';
@@ -35,6 +36,7 @@ import { validateEnv } from './config/env.js';
     NotificationsModule,
     CatalogModule,
     PaymentsModule,
+    SocialModule,
   ],
   controllers: [AppController],
   providers: [

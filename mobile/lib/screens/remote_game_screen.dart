@@ -113,6 +113,8 @@ class _RemoteLudoGameScreenState extends State<RemoteLudoGameScreen> {
     final legal = ((state['legalPieceIds'] as List?) ?? const []).map((e) => int.tryParse('$e') ?? -1).where((e) => e >= 0).toList();
     final status = '${match!['status'] ?? ''}';
     final winner = '${match!['winnerUserId'] ?? ''}';
+    final stake = double.tryParse('${match!['stakeAmount'] ?? 0}') ?? 0;
+    final isWager = '${match!['mode'] ?? ''}' == 'WAGER' || stake > 0;
     final boardItem = controller.equippedItem('BOARD');
     final diceItem = controller.equippedItem('DICE');
     final frameItem = controller.equippedItem('DICE_FRAME');
@@ -131,6 +133,8 @@ class _RemoteLudoGameScreenState extends State<RemoteLudoGameScreen> {
           Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), child: Row(children: [
             IconButton(onPressed: _forfeit, icon: const Icon(Icons.arrow_back_rounded)),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${context.tr('Match')} #${match!['publicCode'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w900)), Text('${match!['mode']} • ${(match!['ruleSet'] as Map?)?['code'] ?? ''}', style: const TextStyle(color: AppColors.muted, fontSize: 10))])),
+            if (isWager) StatusBadge('${stake.toStringAsFixed(0)} MRU', color: AppColors.gold),
+            if (isWager) const SizedBox(width: 6),
             StatusBadge(status, color: status == 'ACTIVE' ? AppColors.green : status == 'COMPLETED' ? AppColors.gold : AppColors.orange),
           ])),
           SizedBox(height: 82, child: ListView.separated(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 10), itemCount: players.length, separatorBuilder: (_, __) => const SizedBox(width: 8), itemBuilder: (context, index) {

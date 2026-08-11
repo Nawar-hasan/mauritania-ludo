@@ -116,29 +116,35 @@ class HomeScreen extends StatelessWidget {
               Container(width: 54, height: 54, decoration: BoxDecoration(color: AppColors.green.withValues(alpha: .13), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.cloud_done_rounded, color: AppColors.green, size: 30)),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(context.tr('Connected test environment'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                Text(context.tr('Online services connected'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
                 const SizedBox(height: 5),
-                Text(context.tr('The information on this page comes from the backend. Pull down to refresh it.'), style: const TextStyle(color: AppColors.muted, height: 1.35, fontSize: 11)),
+                Text(context.tr('Wallet, matches, store and progression are synchronized with the server. Pull down to refresh.'), style: const TextStyle(color: AppColors.muted, height: 1.35, fontSize: 11)),
               ])),
             ]),
           ),
           const SizedBox(height: 20),
-          const SectionTitle('Start a real match', subtitle: 'Casual matches use the server without reserving wallet funds. Wager matches require an approved cash balance.'),
+          const SectionTitle('Play', subtitle: 'Choose casual, cash wager, private room or offline practice.'),
           Row(children: [
-            Expanded(child: _MainGameCard(title: '2 Players', subtitle: 'Head-to-head server match', icon: Icons.people_alt_rounded, gradient: AppGradients.gold, dark: true, onTap: () => Navigator.pushNamed(context, Routes.rules, arguments: {'mode': 'casual', 'players': 2}))),
+            Expanded(child: _MainGameCard(title: 'Casual Match', subtitle: 'Online • No cash wager', icon: Icons.sports_esports_rounded, gradient: AppGradients.cyan, dark: true, onTap: () => Navigator.pushNamed(context, Routes.playerCount, arguments: 'casual'))),
             const SizedBox(width: 10),
-            Expanded(child: _MainGameCard(title: '4 Players', subtitle: 'Full server match', icon: Icons.groups_2_rounded, gradient: AppGradients.cyan, dark: true, onTap: () => Navigator.pushNamed(context, Routes.rules, arguments: {'mode': 'casual', 'players': 4}))),
+            Expanded(child: _MainGameCard(title: 'Wager Match', subtitle: 'Choose stake • Winner takes prize', icon: Icons.payments_rounded, gradient: AppGradients.gold, dark: true, onTap: () => Navigator.pushNamed(context, Routes.playerCount, arguments: 'wager'))),
           ]),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
+          GradientPanel(borderColor: AppColors.gold, onTap: () => Navigator.pushNamed(context, Routes.playerCount, arguments: 'wager'), child: Row(children: [
+            const Icon(Icons.verified_user_rounded, color: AppColors.gold, size: 36), const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(context.tr('Cash wagering'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)), const SizedBox(height: 4), Text(context.tr('Select 2 or 4 players, choose the rules, then choose your stake. The server locks each player stake before the match and settles the prize after the verified result.'), style: const TextStyle(color: AppColors.muted, height: 1.4, fontSize: 10))])),
+            const Icon(Icons.chevron_right_rounded),
+          ])),
+          const SizedBox(height: 14),
           Row(children: [
+            Expanded(child: _QuickAccess(icon: Icons.offline_bolt_rounded, label: 'Offline Play', color: AppColors.cyan, onTap: () => Navigator.pushNamed(context, Routes.offlineMode))),
             Expanded(child: _QuickAccess(icon: Icons.key_rounded, label: 'Private Room', color: AppColors.purpleLight, onTap: () => Navigator.pushNamed(context, Routes.privateRoom))),
             Expanded(child: _QuickAccess(icon: Icons.account_balance_wallet_rounded, label: 'Wallet', color: AppColors.green, onTap: () => onTabChange(3))),
-            Expanded(child: _QuickAccess(icon: Icons.person_rounded, label: 'Profile', color: AppColors.cyan, onTap: () => onTabChange(4))),
           ]),
           const SizedBox(height: 22),
           SectionTitle('Recent match', trailing: TextButton(onPressed: () => Navigator.pushNamed(context, Routes.matchHistory), child: Text(context.tr('View all')))),
           if (recent == null)
-            const EmptyState(icon: Icons.sports_esports_outlined, title: 'No matches yet', message: 'Create a casual match from another test account to begin testing the real game flow.')
+            const EmptyState(icon: Icons.sports_esports_outlined, title: 'No matches yet', message: 'Start a casual or wager match, or use offline practice while you wait for other players.')
           else
             _RecentMatchCard(match: recent),
         ],
