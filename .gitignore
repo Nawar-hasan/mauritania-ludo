@@ -28,6 +28,7 @@ Thumbs.db
 backend/uploads/
 backups/
 *.sql
+!backend/prisma/migrations/**/migration.sql
 
 # Release signing secrets - NEVER COMMIT
 mobile/android/key.properties

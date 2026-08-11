@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNumber, IsOptional, IsString, Matches, MaxLength, Min } from 'class-validator';
+import { IsNumber, IsOptional, IsString, IsUUID, Matches, MaxLength, Min } from 'class-validator';
 
 export class CreateDepositDto {
   @ApiProperty({ minimum: 1 })
@@ -18,7 +18,13 @@ export class CreateDepositDto {
   @MaxLength(120)
   externalRef?: string;
 
-  @ApiPropertyOptional()
+
+  @ApiPropertyOptional({ description: 'Private receipt file UUID returned by /users/me/receipt' })
+  @IsOptional()
+  @IsUUID()
+  receiptFileId?: string;
+
+  @ApiPropertyOptional({ deprecated: true, description: 'Legacy protected receipt URL; final clients should send receiptFileId' })
   @IsOptional()
   @IsString()
   @MaxLength(500)

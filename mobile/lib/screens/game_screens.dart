@@ -14,7 +14,7 @@ class PlayModesScreen extends StatelessWidget {
     OptionTile(icon: Icons.payments_rounded, title: 'Wager Match', subtitle: 'The server reserves the selected amount from every player', color: AppColors.gold, onTap: () => Navigator.pushNamed(context, Routes.playerCount, arguments: 'wager')),
     OptionTile(icon: Icons.key_rounded, title: 'Private Room', subtitle: 'Create a server room or join with its six-digit code', color: AppColors.purpleLight, onTap: () => Navigator.pushNamed(context, Routes.privateRoom)),
     OptionTile(icon: Icons.offline_bolt_rounded, title: 'Offline / Solo Play', subtitle: 'Play locally against computer players with no internet and no wager', color: AppColors.cyan, onTap: () => Navigator.pushNamed(context, Routes.offlineMode)),
-    OptionTile(icon: Icons.emoji_events_outlined, title: 'Tournaments', subtitle: 'Disabled until the tournament backend is connected', color: AppColors.orange, onTap: () => Navigator.pushNamed(context, Routes.tournaments)),
+    OptionTile(icon: Icons.emoji_events_outlined, title: 'Tournaments', subtitle: 'Official brackets, entry status and tournament matches', color: AppColors.orange, onTap: () => Navigator.pushNamed(context, Routes.tournaments)),
   ]));
 }
 
@@ -460,4 +460,3 @@ Map<String, dynamic> _mapArgs(BuildContext context) => ((ModalRoute.of(context)?
 double _double(dynamic value) => double.tryParse('$value') ?? 0;
 double _setting(AppController controller, String key, double fallback) => double.tryParse('${controller.publicSettings?[key] ?? fallback}') ?? fallback;
 void _snack(BuildContext context, String value) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.tr(value))));
-void _notConnected(BuildContext context) => _snack(context, 'This module is not connected yet.');

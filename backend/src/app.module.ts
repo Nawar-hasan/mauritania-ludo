@@ -16,6 +16,9 @@ import { NotificationsModule } from './notifications/notifications.module.js';
 import { CatalogModule } from './catalog/catalog.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { SocialModule } from './social/social.module.js';
+import { EngagementModule } from './engagement/engagement.module.js';
+import { SupportModule } from './support/support.module.js';
+import { TournamentsModule } from './tournaments/tournaments.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
 import { validateEnv } from './config/env.js';
@@ -37,6 +40,9 @@ import { validateEnv } from './config/env.js';
     CatalogModule,
     PaymentsModule,
     SocialModule,
+    EngagementModule,
+    SupportModule,
+    TournamentsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -295,7 +295,7 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 18),
           const Center(child: ScreenHeader(title: 'Welcome back', subtitle: 'Log in to continue your Ludo journey.', icon: Icons.casino_rounded)),
           const SizedBox(height: 36),
-          AppTextField(controller: _identifier, label: 'Phone number or email', hint: 'Enter your account', icon: Icons.person_outline_rounded, textDirection: TextDirection.ltr),
+          AppTextField(controller: _identifier, label: 'Email, phone or username', hint: 'Enter your account', icon: Icons.person_outline_rounded, textDirection: TextDirection.ltr),
           const SizedBox(height: 14),
           AppTextField(
             controller: _password,
@@ -377,11 +377,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.tr('Player name must contain 3 to 24 English letters, numbers or underscores'))));
       return;
     }
-    if (phone.isEmpty && email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.tr('Enter an email or phone number'))));
-      return;
-    }
-    if (email.isNotEmpty && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+    if (email.isEmpty || !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.tr('Enter a valid email address'))));
       return;
     }
@@ -426,7 +422,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 12),
           AppTextField(controller: _phone, label: 'Phone number', icon: Icons.phone_outlined, keyboardType: TextInputType.phone, textDirection: TextDirection.ltr),
           const SizedBox(height: 12),
-          AppTextField(controller: _email, label: 'Email (optional)', icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress, textDirection: TextDirection.ltr),
+          AppTextField(controller: _email, label: 'Email', icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress, textDirection: TextDirection.ltr),
           const SizedBox(height: 12),
           AppTextField(controller: _password, label: 'Password', hint: 'At least 10 characters', icon: Icons.lock_outline_rounded, obscureText: true, textDirection: TextDirection.ltr),
           const SizedBox(height: 12),
@@ -457,62 +453,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 }
 
-class ForgotPasswordScreen extends StatelessWidget {
-  const ForgotPasswordScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) => const AppPage(
-        title: 'Forgot Password',
-        child: EmptyState(
-          icon: Icons.lock_clock_outlined,
-          title: 'Password recovery is not connected yet',
-          message: 'No verification code is generated locally. This feature will be enabled only after connecting a real email or SMS provider.',
-        ),
-      );
-}
-
-class OtpScreen extends StatelessWidget {
-  const OtpScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) => const AppPage(
-        title: 'Verification Code',
-        child: EmptyState(
-          icon: Icons.verified_user_outlined,
-          title: 'Verification is not connected yet',
-          message: 'The application does not accept test codes. A real OTP provider must be configured first.',
-        ),
-      );
-}
-
-class ResetPasswordScreen extends StatelessWidget {
-  const ResetPasswordScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) => const AppPage(
-        title: 'New Password',
-        child: EmptyState(
-          icon: Icons.password_outlined,
-          title: 'Password reset is not connected yet',
-          message: 'This page is disabled until a verified recovery token is issued by the backend.',
-        ),
-      );
-}
-
-class ResetSuccessScreen extends StatelessWidget {
-  const ResetSuccessScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) => const AppPage(
-        showBack: false,
-        child: EmptyState(
-          icon: Icons.info_outline_rounded,
-          title: 'No password was changed',
-          message: 'Return to login. Password recovery will be available after the verification provider is connected.',
-        ),
-      );
-}
-
 class TermsScreen extends StatelessWidget {
   const TermsScreen({super.key});
 
@@ -520,7 +460,7 @@ class TermsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     const sections = [
       ('Age and identity', 'Real-money wallet functions must only be available to eligible users after identity and age verification.'),
-      ('Fair play', 'Dice generation and movement validation will be performed by the backend in the production version. Paid skills are disabled in wager matches.'),
+      ('Fair play', 'Dice generation and movement validation are performed by the authoritative backend. Paid skills are disabled in wager matches.'),
       ('Wagering', 'The entry amount is locked before the match. It is settled after the verified result, refunded if the server cancels the match, and lost on confirmed forfeit.'),
       ('Deposits and withdrawals', 'Every request has a status, reference number and review trail. Withdrawal account details must match verified identity information.'),
       ('Community safety', 'Abuse, cheating, spam and inappropriate content can be reported and may result in account restrictions.'),

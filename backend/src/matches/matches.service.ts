@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomInt } from 'node:crypto';
-import { InventorySource, LedgerDirection, MatchEventType, MatchMode, MatchPlayerStatus, MatchStatus, MatchmakingStatus, NotificationType, PlayerColor, Prisma, TransactionStatus, TransactionType, WalletType } from '../generated/prisma/client.js';
+import { IdentityVerificationStatus, InventorySource, LedgerDirection, MatchEventType, MatchMode, MatchPlayerStatus, MatchStatus, MatchmakingStatus, NotificationType, PlayerColor, Prisma, TransactionStatus, TransactionType, WalletType } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RedisService } from '../redis/redis.service.js';
 import { CreateMatchDto } from './dto/create-match.dto.js';
@@ -76,7 +76,7 @@ export class MatchesService {
     if (!rules?.enabled) throw new BadRequestException('Rule set unavailable');
     const stake = dto.mode === MatchMode.WAGER || dto.mode === MatchMode.PRIVATE ? Number(dto.stakeAmount ?? 0) : 0;
     if (dto.mode === MatchMode.WAGER && stake <= 0) throw new BadRequestException('A wager match requires a positive stake');
-    if (stake > 0) { await this.validateStake(stake); await this.ensureStakeAvailable(userId, stake); }
+    if (stake > 0) { await this.validateStake(stake); await this.ensureWagerEligibility(userId); await this.ensureStakeAvailable(userId, stake); }
     const fee = await this.settingNumber('platform_fee_rate', 0.05);
     return this.prisma.$transaction(async (tx) => {
       const match = await tx.match.create({ data: {
@@ -102,6 +102,7 @@ export class MatchesService {
       const seat = Array.from({ length: match.maxPlayers }, (_, index) => index).find((index) => !usedSeats.has(index));
       if (seat == null) throw new BadRequestException('Match is full');
       const sequence = await this.nextSequence(matchId);
+      if (Number(match.stakeAmount) > 0) await this.ensureWagerEligibility(userId);
       await this.prisma.$transaction(async (tx) => {
         if (Number(match.stakeAmount) > 0) await this.reserveStake(tx, userId, Number(match.stakeAmount), match.id);
         await tx.matchPlayer.create({ data: { matchId, userId, seat, color: colors[seat]!, status: MatchPlayerStatus.JOINED } });
@@ -113,7 +114,8 @@ export class MatchesService {
   }
   async start(matchId: string, userId: string) {
     return this.redis.withLock(`match:${matchId}`, 5000, async () => {
-      const match = await this.full(matchId); if (match.players[0]?.userId !== userId) throw new ForbiddenException('Only the host can start');
+      const match = await this.full(matchId); if (match.mode !== MatchMode.TOURNAMENT && match.players[0]?.userId !== userId) throw new ForbiddenException('Only the host can start');
+      if (match.mode === MatchMode.TOURNAMENT && !match.players.some((player) => player.userId === userId)) throw new ForbiddenException('Only a tournament participant can start');
       if (!this.isWaitingStatus(match.status) || match.players.length !== match.maxPlayers) throw new BadRequestException('All seats must be filled');
       const sequence = await this.nextSequence(matchId);
       const state = LudoEngine.create(match.players.sort((a,b)=>a.seat-b.seat).map((p) => p.userId), this.rules(match.ruleSet));
@@ -226,6 +228,7 @@ export class MatchesService {
   async getForUser(id: string, userId: string) { const match = await this.full(id); if (!match.players.some((p) => p.userId === userId)) throw new ForbiddenException(); return match; }
   async matchmake(userId: string, dto: MatchmakingDto) {
     await this.ensureMatchesEnabled();
+    await this.enforceRateLimit(`matchmaking:${userId}`, 20, 60);
     const existing = await this.prisma.matchmakingTicket.findFirst({
       where: { userId, status: MatchmakingStatus.SEARCHING, expiresAt: { gt: new Date() } },
     });
@@ -233,7 +236,7 @@ export class MatchesService {
 
     const stake = dto.mode === MatchMode.WAGER ? dto.stakeAmount ?? 0 : 0;
     if (dto.mode === MatchMode.WAGER && stake <= 0) throw new BadRequestException('A wager match requires a positive stake');
-    if (stake > 0) { await this.validateStake(stake); await this.ensureStakeAvailable(userId, stake); }
+    if (stake > 0) { await this.validateStake(stake); await this.ensureWagerEligibility(userId); await this.ensureStakeAvailable(userId, stake); }
     const ticket = await this.prisma.matchmakingTicket.create({
       data: {
         userId,
@@ -264,6 +267,12 @@ export class MatchesService {
     const fee = await this.settingNumber('platform_fee_rate', 0.05);
     const participants = [userId, ...peers.map((peer) => peer.userId)];
     const ticketIds = [ticket.id, ...peers.map((peer) => peer.id)];
+    if (stake > 0) {
+      for (const participantId of participants) {
+        await this.ensureWagerEligibility(participantId);
+        await this.ensureStakeAvailable(participantId, stake);
+      }
+    }
     const colors = dto.maxPlayers === 2
       ? [PlayerColor.GREEN, PlayerColor.RED]
       : [PlayerColor.GREEN, PlayerColor.YELLOW, PlayerColor.BLUE, PlayerColor.RED];
@@ -669,6 +678,25 @@ export class MatchesService {
     }
   }
 
+  private async ensureWagerEligibility(userId: string) {
+    const [realMoney, testMode, kycRequired] = await Promise.all([
+      this.settingBoolean('real_money_enabled', false),
+      this.settingBoolean('wager_test_mode', false),
+      this.settingBoolean('kyc_required_for_wager', true),
+    ]);
+    if (!realMoney && !testMode) throw new BadRequestException('Cash wagering is disabled by administration');
+    if (realMoney && kycRequired) {
+      const verification = await this.prisma.identityVerification.findUnique({ where: { userId } });
+      if (verification?.status !== IdentityVerificationStatus.VERIFIED) throw new BadRequestException('Identity verification is required for cash wagering');
+    }
+  }
+
+  private async enforceRateLimit(key: string, limit: number, seconds: number) {
+    const result = await this.redis.rateLimit(key, limit, seconds);
+    if (!result.allowed) throw new BadRequestException('Too many matchmaking requests. Please wait and try again.');
+  }
+
+  private async settingBoolean(key: string, fallback: boolean) { const s = await this.prisma.appSetting.findUnique({ where: { key } }); return typeof s?.value === 'boolean' ? s.value : fallback; }
   private async settingNumber(key: string, fallback: number) { const s = await this.prisma.appSetting.findUnique({ where: { key } }); return typeof s?.value === 'number' ? s.value : fallback; }
   private async uniqueCode() { for (;;) { const code = String(randomInt(100000, 1000000)); if (!(await this.prisma.match.findUnique({ where: { publicCode: code } }))) return code; } }
 }

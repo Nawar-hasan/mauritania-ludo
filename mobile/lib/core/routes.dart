@@ -62,6 +62,6 @@ abstract final class Routes {
   static const privacySettings = '/privacy-settings';
   static const soundSettings = '/sound-settings';
   static const support = '/support';
+  static const identityVerification = '/identity-verification';
   static const about = '/about';
-  static const catalog = '/catalog';
 }

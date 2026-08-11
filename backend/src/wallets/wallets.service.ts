@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, HttpException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   Prisma,
+  IdentityVerificationStatus,
   LedgerDirection,
   TransactionStatus,
   TransactionType,
@@ -9,12 +10,13 @@ import {
   PaymentIntentStatus,
 } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { RedisService } from '../redis/redis.service.js';
 import { CreateDepositDto } from './dto/create-deposit.dto.js';
 import { CreateWithdrawalDto } from './dto/create-withdrawal.dto.js';
 
 @Injectable()
 export class WalletsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly redis: RedisService) {}
 
   getAccounts(userId: string) {
     return this.prisma.walletAccount.findMany({ where: { userId }, orderBy: { type: 'asc' } });
@@ -57,15 +59,23 @@ export class WalletsService {
   }
 
   async createDepositRequest(userId: string, dto: CreateDepositDto) {
+    await this.ensureDepositEligibility(userId);
     const method = await this.prisma.paymentMethod.findUnique({ where: { code: dto.method } });
     if (!method || method.status !== PaymentMethodStatus.ACTIVE || !method.supportsDeposit) {
       throw new BadRequestException('Payment method is not available for deposits');
     }
+    const receipt = await this.resolvePrivateReceipt(userId, dto.receiptFileId, dto.receiptUrl);
+    if (method.provider === 'MANUAL' && !receipt) throw new BadRequestException('A transfer receipt is required for manual deposits');
     const amount = new Prisma.Decimal(dto.amount);
     if (amount.lessThan(method.minAmount) || amount.greaterThan(method.maxAmount)) {
       throw new BadRequestException(`Deposit must be between ${method.minAmount} and ${method.maxAmount} ${method.currency}`);
     }
     const fee = method.feeFixed.add(amount.mul(method.feeRate));
+    const idempotencyKey = receipt ? `manual-deposit:${userId}:${receipt.id}` : undefined;
+    if (idempotencyKey) {
+      const existing = await this.prisma.financialTransaction.findUnique({ where: { idempotencyKey } });
+      if (existing) return existing;
+    }
     return this.prisma.financialTransaction.create({
       data: {
         userId,
@@ -75,17 +85,19 @@ export class WalletsService {
         fee,
         currency: method.currency,
         externalRef: dto.externalRef,
+        idempotencyKey,
         description: `Deposit request via ${method.code}`,
         metadata: {
           method: method.code,
           provider: method.provider,
-          receiptUrl: dto.receiptUrl ?? null,
+          receiptFileId: receipt?.id ?? null, receiptUrl: receipt?.publicUrl ?? null,
         },
       },
     });
   }
 
   async createWithdrawalRequest(userId: string, dto: CreateWithdrawalDto) {
+    await this.ensureWithdrawalEligibility(userId);
     const method = await this.prisma.paymentMethod.findUnique({ where: { code: dto.method } });
     if (!method || method.status !== PaymentMethodStatus.ACTIVE || !method.supportsWithdrawal) {
       throw new BadRequestException('Payment method is not available for withdrawals');
@@ -368,6 +380,51 @@ export class WalletsService {
       });
       return transaction;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }
+
+  async ensureDepositEligibility(userId: string) {
+    await this.enforceLimit(`money:deposit:${userId}`, 12, 3600);
+    return this.ensureMoneyOperationEligibility(userId, 'kyc_required_for_deposit', 'deposits');
+  }
+
+  private async ensureWithdrawalEligibility(userId: string) {
+    await this.enforceLimit(`money:withdrawal:${userId}`, 12, 3600);
+    return this.ensureMoneyOperationEligibility(userId, 'kyc_required_for_withdrawal', 'withdrawals');
+  }
+
+  private async ensureMoneyOperationEligibility(userId: string, kycSettingKey: string, operation: string) {
+    const [realMoney, testMode, kycRequired] = await Promise.all([
+      this.prisma.appSetting.findUnique({ where: { key: 'real_money_enabled' } }),
+      this.prisma.appSetting.findUnique({ where: { key: 'money_test_mode' } }),
+      this.prisma.appSetting.findUnique({ where: { key: kycSettingKey } }),
+    ]);
+    const live = realMoney?.value === true;
+    const testing = testMode?.value === true;
+    if (!live && !testing) throw new BadRequestException(`Cash ${operation} are disabled by administration`);
+    if (live && kycRequired?.value !== false) {
+      const verification = await this.prisma.identityVerification.findUnique({ where: { userId } });
+      if (verification?.status !== IdentityVerificationStatus.VERIFIED) throw new BadRequestException(`Identity verification is required for ${operation}`);
+    }
+  }
+
+  async resolvePrivateReceipt(userId: string, receiptFileId?: string, legacyReceiptUrl?: string) {
+    let id = receiptFileId?.trim();
+    if (!id && legacyReceiptUrl) {
+      try {
+        const url = new URL(legacyReceiptUrl);
+        const match = url.pathname.match(/\/api\/v1\/files\/([0-9a-f-]{36})$/i);
+        id = match?.[1];
+      } catch { /* rejected below */ }
+    }
+    if (!id) return null;
+    const file = await this.prisma.uploadedFile.findFirst({ where: { id, userId, isPrivate: true } });
+    if (!file || !file.storageKey.startsWith(`receipts/${userId}/`)) throw new BadRequestException('Receipt file is invalid or does not belong to this account');
+    return file;
+  }
+
+  private async enforceLimit(key: string, limit: number, seconds: number) {
+    const result = await this.redis.rateLimit(key, limit, seconds);
+    if (!result.allowed) throw new HttpException(`Too many requests. Try again in ${result.retryAfter} seconds.`, 429);
   }
 
   private async settingNumber(key: string, fallback: number) {

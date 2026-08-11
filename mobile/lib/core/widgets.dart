@@ -3,6 +3,7 @@ import 'app_controller.dart';
 import 'api_config.dart';
 import 'localization.dart';
 import 'app_theme.dart';
+import 'motion.dart';
 
 class AppPage extends StatelessWidget {
   const AppPage({
@@ -116,10 +117,15 @@ class GradientPanel extends StatelessWidget {
       child: child,
     );
     if (onTap == null) return panel;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(radius),
-      child: panel,
+    return PressScale(
+      child: InkWell(
+        onTap: onTap == null ? null : () {
+          AppScope.of(context).interactionFeedback();
+          onTap!();
+        },
+        borderRadius: BorderRadius.circular(radius),
+        child: panel,
+      ),
     );
   }
 }
@@ -158,7 +164,10 @@ class GoldButton extends StatelessWidget {
         ],
       ),
       child: ElevatedButton.icon(
-        onPressed: onPressed,
+        onPressed: onPressed == null ? null : () {
+          AppScope.of(context).interactionFeedback(strong: true);
+          onPressed!();
+        },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
@@ -176,7 +185,8 @@ class GoldButton extends StatelessWidget {
         label: Text(context.tr(label), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
       ),
     );
-    return expanded ? SizedBox(width: double.infinity, child: button) : button;
+    final animated = PressScale(enabled: onPressed != null, child: button);
+    return expanded ? SizedBox(width: double.infinity, child: animated) : animated;
   }
 }
 
@@ -188,12 +198,17 @@ class PurpleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return PressScale(
+      enabled: onPressed != null,
+      child: SizedBox(
       width: double.infinity,
       child: DecoratedBox(
         decoration: BoxDecoration(gradient: AppGradients.purple, borderRadius: BorderRadius.circular(18)),
         child: ElevatedButton.icon(
-          onPressed: onPressed,
+          onPressed: onPressed == null ? null : () {
+            AppScope.of(context).interactionFeedback();
+            onPressed!();
+          },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
@@ -205,7 +220,7 @@ class PurpleButton extends StatelessWidget {
           label: Text(context.tr(label), style: TextStyle(fontWeight: FontWeight.w800)),
         ),
       ),
-    );
+    ));
   }
 }
 
@@ -266,7 +281,7 @@ class BalancePill extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (label != null) Text(context.tr(label!), style: TextStyle(fontSize: 9, color: AppColors.muted)),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+              AnimatedSwitcher(duration: AppMotion.normal, transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: ScaleTransition(scale: Tween<double>(begin: .9, end: 1).animate(animation), child: child)), child: Text(value, key: ValueKey(value), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13))),
             ],
           ),
         ],
@@ -379,10 +394,11 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AnimatedContainer(
+      duration: AppMotion.normal,
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(color: color.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(20), border: Border.all(color: color.withValues(alpha: 0.6))),
-      child: Text(context.tr(label), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: color)),
+      child: AnimatedSwitcher(duration: AppMotion.fast, child: Text(context.tr(label), key: ValueKey(label), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: color))),
     );
   }
 }

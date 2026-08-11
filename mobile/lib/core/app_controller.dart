@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'api_client.dart';
 import 'session_store.dart';
 
@@ -34,6 +35,12 @@ class AppController extends ChangeNotifier {
   List<Map<String, dynamic>> paymentMethods = [];
   List<Map<String, dynamic>> gameRules = [];
   List<Map<String, dynamic>> socialRooms = [];
+  List<Map<String, dynamic>> tournaments = [];
+  List<Map<String, dynamic>> achievements = [];
+  List<Map<String, dynamic>> supportTickets = [];
+  Map<String, dynamic>? referralOverview;
+  Map<String, dynamic>? privacySettings;
+  Map<String, dynamic>? identityVerification;
 
   double walletBalance = 0;
   double withdrawableBalance = 0;
@@ -52,9 +59,13 @@ class AppController extends ChangeNotifier {
       session.getLocale(),
       session.hasCompletedOnboarding(),
       session.accessToken,
+      session.getEffectsEnabled(),
+      session.getVibrationEnabled(),
     ]);
     isArabic = local[0] == 'ar';
     hasSeenOnboarding = local[1] == true;
+    effectsEnabled = local[3] != false;
+    vibrationEnabled = local[4] != false;
 
     // Do not block the splash screen on public network calls.
     final storedAccessToken = local[2] as String?;
@@ -115,7 +126,7 @@ class AppController extends ChangeNotifier {
     required String displayName,
     required String username,
     String? phone,
-    String? email,
+    required String email,
     required String password,
   }) async {
     return _run(() async {
@@ -124,14 +135,25 @@ class AppController extends ChangeNotifier {
         'username': username.trim(),
         'password': password,
         'locale': isArabic ? 'ar' : 'en',
+        'acceptedTerms': true,
       };
       if (phone != null && phone.trim().isNotEmpty) payload['phone'] = phone.trim();
-      if (email != null && email.trim().isNotEmpty) payload['email'] = email.trim();
+      payload['email'] = email.trim();
       final result = (await api.post('/auth/register', authenticated: false, body: payload) as Map).cast<String, dynamic>();
       await _acceptAuth(result);
       unawaited(refreshAll());
     });
   }
+
+  Future<Map<String, dynamic>?> requestPasswordReset(String identifier) => _runValue(() async =>
+      (await api.post('/auth/password/forgot', authenticated: false, body: {'identifier': identifier.trim()}) as Map).cast<String, dynamic>());
+
+  Future<Map<String, dynamic>?> verifyPasswordReset(String requestId, String code) => _runValue(() async =>
+      (await api.post('/auth/password/verify', authenticated: false, body: {'requestId': requestId, 'code': code.trim()}) as Map).cast<String, dynamic>());
+
+  Future<bool> completePasswordReset(String requestId, String resetToken, String newPassword) => _run(() async {
+    await api.post('/auth/password/reset', authenticated: false, body: {'requestId': requestId, 'resetToken': resetToken, 'newPassword': newPassword});
+  });
 
   Future<void> _acceptAuth(Map<String, dynamic> result) async {
     await session.saveTokens(
@@ -151,6 +173,7 @@ class AppController extends ChangeNotifier {
     matches = [];
     notifications = [];
     inventory = [];
+    tournaments = []; achievements = []; supportTickets = []; referralOverview = null; privacySettings = null; identityVerification = null;
     _clearBalances();
     notifyListeners();
   }
@@ -197,11 +220,10 @@ class AppController extends ChangeNotifier {
     });
   }
 
-  Future<String?> uploadReceiptBytes(Uint8List bytes, String filename) async {
+  Future<Map<String, dynamic>?> uploadReceiptBytes(Uint8List bytes, String filename) async {
     errorMessage = null;
     try {
-      final result = await api.uploadBytes('/users/me/receipt', bytes, filename);
-      return result['url']?.toString() ?? result['publicUrl']?.toString();
+      return await api.uploadBytes('/users/me/receipt', bytes, filename);
     } catch (error) {
       errorMessage = _message(error);
       notifyListeners();
@@ -209,28 +231,38 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>?> uploadIdentityDocumentBytes(Uint8List bytes, String filename) async {
+    errorMessage = null;
+    try {
+      return await api.uploadBytes('/users/me/identity-document', bytes, filename);
+    } catch (error) {
+      errorMessage = _message(error);
+      notifyListeners();
+      return null;
+    }
+  }
 
   Future<Map<String, dynamic>?> createPaymentIntent({
     required String methodCode,
     required double amount,
     String? phoneNumber,
     String? externalRef,
-    String? receiptUrl,
+    String? receiptFileId,
   }) => _runValue(() async => (await api.post('/payments/deposits', body: {
     'methodCode': methodCode,
     'amount': amount,
     if (phoneNumber != null && phoneNumber.isNotEmpty) 'phoneNumber': phoneNumber,
     if (externalRef != null && externalRef.isNotEmpty) 'externalRef': externalRef,
-    if (receiptUrl != null && receiptUrl.isNotEmpty) 'receiptUrl': receiptUrl,
+    if (receiptFileId != null && receiptFileId.isNotEmpty) 'receiptFileId': receiptFileId,
   }) as Map).cast<String, dynamic>());
 
-  Future<bool> createDepositRequest({required double amount, required String method, String? externalRef, String? receiptUrl}) {
+  Future<bool> createDepositRequest({required double amount, required String method, String? externalRef, String? receiptFileId}) {
     return _run(() async {
       await api.post('/wallets/me/deposits', body: {
         'amount': amount,
         'method': method,
         if (externalRef != null && externalRef.isNotEmpty) 'externalRef': externalRef,
-        if (receiptUrl != null && receiptUrl.isNotEmpty) 'receiptUrl': receiptUrl,
+        if (receiptFileId != null && receiptFileId.isNotEmpty) 'receiptFileId': receiptFileId,
       });
       await refreshAll();
     });
@@ -324,6 +356,75 @@ class AppController extends ChangeNotifier {
   }
   Future<Map<String, dynamic>?> sendSocialMessage(String id, String text) => _runValue(() async => (await api.post('/social/rooms/$id/messages', body: {'text': text}) as Map).cast<String, dynamic>());
   Future<Map<String, dynamic>?> requestVoiceSession(String id) => _runValue(() async => (await api.post('/social/rooms/$id/voice-session') as Map).cast<String, dynamic>());
+
+  Future<void> loadTournaments() async {
+    final result = await _runValue(() async => await api.get('/tournaments'));
+    if (result != null) { tournaments = _items(result); notifyListeners(); }
+  }
+
+  Future<Map<String, dynamic>?> tournamentDetails(String id) => _runValue(() async =>
+      (await api.get('/tournaments/$id') as Map).cast<String, dynamic>());
+  Future<bool> joinTournament(String id) => _run(() async { await api.post('/tournaments/$id/join'); await loadTournaments(); await refreshAll(); });
+  Future<bool> withdrawTournament(String id) => _run(() async { await api.delete('/tournaments/$id/join'); await loadTournaments(); await refreshAll(); });
+
+  Future<List<Map<String, dynamic>>> loadLeaderboard() async {
+    final result = await _runValue(() async => await api.get('/engagement/leaderboard'));
+    return result == null ? <Map<String,dynamic>>[] : _items(result);
+  }
+
+  Future<void> loadAchievements() async {
+    final result = await _runValue(() async => await api.get('/engagement/achievements'));
+    if (result != null) { achievements = _items(result); notifyListeners(); }
+  }
+  Future<bool> claimAchievement(String id) => _run(() async { await api.post('/engagement/achievements/$id/claim'); await loadAchievements(); await refreshAll(); });
+
+  Future<Map<String, dynamic>?> loadReferralOverview() async {
+    final result = await _runValue(() async => (await api.get('/engagement/referral') as Map).cast<String, dynamic>());
+    if (result != null) { referralOverview = result; notifyListeners(); }
+    return result;
+  }
+  Future<bool> applyReferralCode(String code) => _run(() async { await api.post('/engagement/referral/apply', body: {'code': code.trim()}); await loadReferralOverview(); await refreshAll(); });
+
+  Future<Map<String, dynamic>?> loadPrivacySettings() async {
+    final result = await _runValue(() async => (await api.get('/users/me/privacy') as Map).cast<String, dynamic>());
+    if (result != null) { privacySettings = result; notifyListeners(); }
+    return result;
+  }
+  Future<bool> savePrivacySettings({required bool showOnlineStatus, required bool allowDirectMessages, required bool allowInvites}) => _run(() async {
+    privacySettings = (await api.patch('/users/me/privacy', body: {'showOnlineStatus': showOnlineStatus, 'allowDirectMessages': allowDirectMessages, 'allowInvites': allowInvites}) as Map).cast<String, dynamic>();
+  });
+
+  Future<Map<String, dynamic>?> loadIdentityVerification() async {
+    final result = await _runValue(() async => (await api.get('/users/me/identity') as Map).cast<String, dynamic>());
+    if (result != null) { identityVerification = result; notifyListeners(); }
+    return result;
+  }
+  Future<bool> submitIdentity({
+    required String legalName, required DateTime dateOfBirth, required String countryCode,
+    required String documentFrontFileId, String? documentBackFileId, required String selfieFileId,
+  }) => _run(() async {
+    identityVerification = (await api.post('/users/me/identity', body: {
+      'legalName': legalName.trim(),
+      'dateOfBirth': dateOfBirth.toUtc().toIso8601String(),
+      'countryCode': countryCode.trim().toUpperCase(),
+      'documentFrontFileId': documentFrontFileId,
+      if (documentBackFileId != null && documentBackFileId.isNotEmpty) 'documentBackFileId': documentBackFileId,
+      'selfieFileId': selfieFileId,
+    }) as Map).cast<String, dynamic>();
+  });
+
+  Future<void> loadSupportTickets() async {
+    final result = await _runValue(() async => await api.get('/support/tickets'));
+    if (result != null) { supportTickets = _items(result); notifyListeners(); }
+  }
+  Future<Map<String, dynamic>?> createSupportTicket({required String subject, required String category, required String message, int priority = 2}) => _runValue(() async {
+    final result = (await api.post('/support/tickets', body: {'subject': subject.trim(), 'category': category, 'message': message.trim(), 'priority': priority}) as Map).cast<String, dynamic>();
+    await loadSupportTickets();
+    return result;
+  });
+  Future<Map<String, dynamic>?> supportTicket(String id) => _runValue(() async => (await api.get('/support/tickets/$id') as Map).cast<String, dynamic>());
+  Future<bool> sendSupportMessage(String id, String text) => _run(() async { await api.post('/support/tickets/$id/messages', body: {'text': text.trim()}); });
+  Future<bool> closeSupportTicket(String id) => _run(() async { await api.post('/support/tickets/$id/close'); await loadSupportTickets(); });
 
   Future<bool> markNotificationsRead() => _run(() async {
     await api.patch('/notifications/read-all');
@@ -458,7 +559,7 @@ class AppController extends ChangeNotifier {
   }
 
   List<Map<String, dynamic>> _items(dynamic response) {
-    final raw = response is Map ? response['items'] : null;
+    final raw = response is Map ? response['items'] : response;
     if (raw is! List) return [];
     return raw.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
   }
@@ -500,13 +601,13 @@ class AppController extends ChangeNotifier {
     if (error is ApiException) {
       if (error.message == 'NETWORK_TIMEOUT') {
         return isArabic
-            ? 'انتهت مهلة الاتصال بالخادم. تأكد أن الهاتف والكمبيوتر على نفس شبكة Wi‑Fi، وأن VPN مغلق على الكمبيوتر، وأن الباكند يعمل.'
-            : 'Server connection timed out. Make sure the phone and computer are on the same Wi-Fi, VPN is off on the computer, and the backend is running.';
+            ? 'انتهت مهلة الاتصال بالخادم. تحقق من اتصال الإنترنت ثم أعد المحاولة.'
+            : 'Server connection timed out. Check your internet connection and try again.';
       }
       if (error.message == 'NETWORK_UNREACHABLE') {
         return isArabic
-            ? 'تعذر الوصول إلى الخادم. افحص عنوان IP للكمبيوتر، أوقف VPN، وتأكد من السماح للمنفذ 3000 في جدار الحماية.'
-            : 'Cannot reach the server. Check the computer IP, turn off VPN, and allow port 3000 through the firewall.';
+            ? 'تعذر الوصول إلى الخادم. تحقق من اتصال الإنترنت وحاول مرة أخرى.'
+            : 'Cannot reach the server. Check your internet connection and try again.';
       }
       return error.message;
     }
@@ -523,8 +624,15 @@ class AppController extends ChangeNotifier {
   }
 
   void toggleMusic(bool value) { musicEnabled = value; notifyListeners(); }
-  void toggleEffects(bool value) { effectsEnabled = value; notifyListeners(); }
-  void toggleVibration(bool value) { vibrationEnabled = value; notifyListeners(); }
+  Future<void> toggleEffects(bool value) async { effectsEnabled = value; notifyListeners(); await session.setEffectsEnabled(value); }
+  Future<void> toggleVibration(bool value) async { vibrationEnabled = value; notifyListeners(); await session.setVibrationEnabled(value); }
+
+  Future<void> interactionFeedback({bool strong = false}) async {
+    if (effectsEnabled) await SystemSound.play(SystemSoundType.click);
+    if (vibrationEnabled) {
+      if (strong) { await HapticFeedback.mediumImpact(); } else { await HapticFeedback.selectionClick(); }
+    }
+  }
 
 
 }

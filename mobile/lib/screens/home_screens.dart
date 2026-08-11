@@ -5,6 +5,7 @@ import '../core/app_theme.dart';
 import '../core/routes.dart';
 import '../core/widgets.dart';
 import '../core/localization.dart';
+import '../core/motion.dart';
 import 'profile_screens.dart';
 import 'social_screens.dart';
 import 'store_screens.dart';
@@ -83,7 +84,7 @@ class HomeScreen extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
         children: [
-          Row(children: [
+          AppReveal(child: Row(children: [
             PlayerAvatar(name: controller.displayName, avatarUrl: controller.avatarUrl, size: 56, level: level),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -97,20 +98,20 @@ class HomeScreen extends StatelessWidget {
               if (unread > 0) Positioned(top: 4, right: 4, child: CircleAvatar(radius: 9, backgroundColor: AppColors.red, child: Text('$unread', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900)))),
             ]),
             IconButton(onPressed: () => _showQuickSettings(context), icon: const Icon(Icons.settings_outlined)),
-          ]),
+          ])),
           const SizedBox(height: 16),
-          Wrap(spacing: 8, runSpacing: 8, children: [
+          AppReveal(delay: const Duration(milliseconds: 70), child: Wrap(spacing: 8, runSpacing: 8, children: [
             BalancePill(icon: Icons.account_balance_wallet_rounded, value: '${controller.walletBalance.toStringAsFixed(0)} MRU', color: AppColors.green, label: 'Cash balance'),
             BalancePill(icon: Icons.lock_outline_rounded, value: '${controller.lockedBalance.toStringAsFixed(0)} MRU', color: AppColors.orange, label: 'Locked balance'),
             BalancePill(icon: Icons.monetization_on_outlined, value: '${controller.coins}', color: AppColors.gold, label: 'Coins'),
             BalancePill(icon: Icons.diamond_outlined, value: '${controller.gems}', color: AppColors.cyan, label: 'Gems'),
-          ]),
+          ])),
           const SizedBox(height: 18),
           if (homeCampaign != null) ...[
             _HomeCampaignBanner(campaign: homeCampaign, onTabChange: onTabChange),
             const SizedBox(height: 18),
           ],
-          GradientPanel(
+          AppReveal(delay: const Duration(milliseconds: 120), child: GradientPanel(
             borderColor: AppColors.green,
             child: Row(children: [
               Container(width: 54, height: 54, decoration: BoxDecoration(color: AppColors.green.withValues(alpha: .13), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.cloud_done_rounded, color: AppColors.green, size: 30)),
@@ -121,13 +122,13 @@ class HomeScreen extends StatelessWidget {
                 Text(context.tr('Wallet, matches, store and progression are synchronized with the server. Pull down to refresh.'), style: const TextStyle(color: AppColors.muted, height: 1.35, fontSize: 11)),
               ])),
             ]),
-          ),
+          )),
           const SizedBox(height: 20),
           const SectionTitle('Play', subtitle: 'Choose casual, cash wager, private room or offline practice.'),
           Row(children: [
             Expanded(child: _MainGameCard(title: 'Casual Match', subtitle: 'Online • No cash wager', icon: Icons.sports_esports_rounded, gradient: AppGradients.cyan, dark: true, onTap: () => Navigator.pushNamed(context, Routes.playerCount, arguments: 'casual'))),
             const SizedBox(width: 10),
-            Expanded(child: _MainGameCard(title: 'Wager Match', subtitle: 'Choose stake • Winner takes prize', icon: Icons.payments_rounded, gradient: AppGradients.gold, dark: true, onTap: () => Navigator.pushNamed(context, Routes.playerCount, arguments: 'wager'))),
+            Expanded(child: BreathingGlow(child: _MainGameCard(title: 'Wager Match', subtitle: 'Choose stake • Winner takes prize', icon: Icons.payments_rounded, gradient: AppGradients.gold, dark: true, onTap: () => Navigator.pushNamed(context, Routes.playerCount, arguments: 'wager')))),
           ]),
           const SizedBox(height: 12),
           GradientPanel(borderColor: AppColors.gold, onTap: () => Navigator.pushNamed(context, Routes.playerCount, arguments: 'wager'), child: Row(children: [
@@ -273,11 +274,11 @@ class _QuickAccess extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) => InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: Column(children: [
+  Widget build(BuildContext context) => PressScale(child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: Column(children: [
     Container(width: 58, height: 58, decoration: BoxDecoration(color: color.withValues(alpha: .15), borderRadius: BorderRadius.circular(18), border: Border.all(color: color.withValues(alpha: .6))), child: Icon(icon, color: color, size: 29)),
     const SizedBox(height: 7),
     Text(context.tr(label), textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: AppColors.muted, fontWeight: FontWeight.w700)),
-  ]));
+  ])));
 }
 
 class QuickSettingsSheet extends StatefulWidget {
@@ -338,10 +339,4 @@ class NotificationsScreen extends StatelessWidget {
             }).toList()),
     );
   }
-}
-
-class ScreenCatalogScreen extends StatelessWidget {
-  const ScreenCatalogScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const AppPage(title: 'Developer tools', child: EmptyState(icon: Icons.developer_mode_rounded, title: 'Catalog disabled', message: 'The production test build no longer exposes screens backed by mock data.'));
 }

@@ -11,6 +11,6 @@ import { UploadsService } from './uploads.service.js';
 @Controller('admin/uploads')
 export class AdminUploadsController {
   constructor(private readonly uploads: UploadsService) {}
-  @Post('assets') @ApiConsumes('multipart/form-data') @UseInterceptors(FileInterceptor('file'))
+  @Post('assets') @ApiConsumes('multipart/form-data') @UseInterceptors(FileInterceptor('file', { limits: { files: 1, fileSize: Number(process.env.MAX_UPLOAD_BYTES ?? 5_242_880) } }))
   asset(@CurrentUser() user: AuthUser, @UploadedFile() file: Express.Multer.File) { return this.uploads.asset(user.sub, file); }
 }

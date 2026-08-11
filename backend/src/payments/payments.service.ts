@@ -35,9 +35,20 @@ export class PaymentsService {
   }
 
   async createDepositIntent(userId: string, dto: CreatePaymentIntentDto) {
+    await this.wallets.ensureDepositEligibility(userId);
     const method = await this.prisma.paymentMethod.findUnique({ where: { code: dto.methodCode } });
     if (!method || method.status !== PaymentMethodStatus.ACTIVE || !method.supportsDeposit) {
       throw new NotFoundException('Payment method is not available');
+    }
+    const receipt = await this.wallets.resolvePrivateReceipt(userId, dto.receiptFileId, dto.receiptUrl);
+    if (method.provider === PaymentProvider.MANUAL && !receipt) throw new BadRequestException('A transfer receipt is required for manual deposits');
+    const manualIdempotencyKey = receipt ? `manual-deposit:${userId}:${receipt.id}` : null;
+    if (manualIdempotencyKey) {
+      const existingTransaction = await this.prisma.financialTransaction.findUnique({ where: { idempotencyKey: manualIdempotencyKey } });
+      if (existingTransaction) {
+        const existingIntent = await this.prisma.paymentIntent.findFirst({ where: { transactionId: existingTransaction.id }, include: { method: true } });
+        if (existingIntent) return { transaction: existingTransaction, intent: existingIntent, provider: method.provider };
+      }
     }
     const amount = new Prisma.Decimal(dto.amount);
     if (amount.lessThan(method.minAmount) || amount.greaterThan(method.maxAmount)) {
@@ -48,16 +59,16 @@ export class PaymentsService {
       const transaction = await tx.financialTransaction.create({
         data: {
           userId, type: TransactionType.DEPOSIT, status: TransactionStatus.PENDING,
-          amount, fee, currency: method.currency, externalRef: dto.externalRef,
+          amount, fee, currency: method.currency, externalRef: dto.externalRef, idempotencyKey: manualIdempotencyKey,
           description: `Deposit via ${method.code}`,
-          metadata: { methodCode: method.code, phoneNumber: dto.phoneNumber ?? null, receiptUrl: dto.receiptUrl ?? null },
+          metadata: { methodCode: method.code, phoneNumber: dto.phoneNumber ?? null, receiptFileId: receipt?.id ?? null, receiptUrl: receipt?.publicUrl ?? null },
         },
       });
       const intent = await tx.paymentIntent.create({
         data: {
           userId, methodId: method.id, transactionId: transaction.id, status: PaymentIntentStatus.PENDING,
           amount, fee, currency: method.currency, expiresAt: new Date(Date.now() + 30 * 60 * 1000),
-          metadata: { phoneNumber: dto.phoneNumber ?? null, receiptUrl: dto.receiptUrl ?? null },
+          metadata: { phoneNumber: dto.phoneNumber ?? null, receiptFileId: receipt?.id ?? null, receiptUrl: receipt?.publicUrl ?? null },
         },
       });
       return { transaction, intent };
@@ -84,6 +95,7 @@ export class PaymentsService {
     const base = process.env.PUBLIC_APP_URL ?? 'https://example.invalid';
     const response = await fetch(endpoint, {
       method: 'POST',
+      signal: AbortSignal.timeout(8000),
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
       body: JSON.stringify({
         transactionId,
@@ -119,11 +131,25 @@ export class PaymentsService {
         where: { id: intent.id },
         data: { status: PaymentIntentStatus.SUCCEEDED, providerRef: String(data.id ?? data.referenceId ?? intent.providerRef ?? ''), completedAt: new Date(), metadata: data as Prisma.InputJsonValue },
       });
-    } else if (['failed','cancelled','expired'].includes(status)) {
-      await this.prisma.paymentIntent.update({
-        where: { id: intent.id },
-        data: { status: status === 'expired' ? PaymentIntentStatus.EXPIRED : status === 'cancelled' ? PaymentIntentStatus.CANCELLED : PaymentIntentStatus.FAILED, metadata: data as Prisma.InputJsonValue },
-      });
+    } else if (['failed','cancelled','expired'].includes(status) && intent.status !== PaymentIntentStatus.SUCCEEDED) {
+      const intentStatus = status === 'expired'
+        ? PaymentIntentStatus.EXPIRED
+        : status === 'cancelled'
+          ? PaymentIntentStatus.CANCELLED
+          : PaymentIntentStatus.FAILED;
+      const transactionStatus = status === 'cancelled' || status === 'expired'
+        ? TransactionStatus.CANCELLED
+        : TransactionStatus.REJECTED;
+      await this.prisma.$transaction([
+        this.prisma.paymentIntent.update({
+          where: { id: intent.id },
+          data: { status: intentStatus, metadata: data as Prisma.InputJsonValue },
+        }),
+        this.prisma.financialTransaction.updateMany({
+          where: { id: transactionId, type: TransactionType.DEPOSIT, status: { in: [TransactionStatus.PENDING, TransactionStatus.PROCESSING] } },
+          data: { status: transactionStatus, processedAt: new Date() },
+        }),
+      ]);
     }
     return { received: true };
   }
@@ -132,7 +158,9 @@ export class PaymentsService {
     if (!signature.startsWith('sha256=')) return false;
     const expected = createHmac('sha256', secret).update(raw).digest('hex');
     const received = signature.slice(7);
-    if (received.length !== expected.length) return false;
-    return timingSafeEqual(Buffer.from(received, 'hex'), Buffer.from(expected, 'hex'));
+    if (received.length !== expected.length || !/^[0-9a-f]{64}$/i.test(received)) return false;
+    const receivedBytes = Buffer.from(received, 'hex');
+    const expectedBytes = Buffer.from(expected, 'hex');
+    return receivedBytes.length === expectedBytes.length && timingSafeEqual(receivedBytes, expectedBytes);
   }
 }

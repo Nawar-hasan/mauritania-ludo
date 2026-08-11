@@ -169,7 +169,14 @@ class _RemoteLudoGameScreenState extends State<RemoteLudoGameScreen> {
           )),
           Padding(padding: const EdgeInsets.fromLTRB(14, 8, 14, 14), child: GradientPanel(borderColor: isMyTurn ? AppColors.gold : AppColors.divider, padding: const EdgeInsets.all(12), child: Column(children: [
             Row(children: [
-              _DiceFace(value: int.tryParse('${state['dice'] ?? 0}') ?? 0, style: diceStyle, frameStyle: frameStyle),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 320),
+                transitionBuilder: (child, animation) => RotationTransition(
+                  turns: Tween<double>(begin: -.12, end: 0).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutBack)),
+                  child: ScaleTransition(scale: Tween<double>(begin: .72, end: 1).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutBack)), child: child),
+                ),
+                child: _DiceFace(key: ValueKey('${state['version'] ?? ''}:${state['dice'] ?? 0}'), value: int.tryParse('${state['dice'] ?? 0}') ?? 0, style: diceStyle, frameStyle: frameStyle),
+              ),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(status == 'COMPLETED' ? (winner == currentUserId ? context.tr('You won') : context.tr('Match completed')) : isMyTurn ? context.tr('Your turn') : '${context.tr('Waiting for')} ${_nameFor('${active['userId'] ?? ''}')}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
@@ -194,7 +201,7 @@ class _RemoteLudoGameScreenState extends State<RemoteLudoGameScreen> {
 }
 
 class _DiceFace extends StatelessWidget {
-  const _DiceFace({required this.value, required this.style, required this.frameStyle});
+  const _DiceFace({super.key, required this.value, required this.style, required this.frameStyle});
   final int value;
   final Map<String,dynamic> style;
   final Map<String,dynamic> frameStyle;

@@ -1,12 +1,13 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { SocialRoomMemberRole, SocialRoomType, SocialRoomVisibility } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { RedisService } from '../redis/redis.service.js';
 import { CreateRoomDto } from './dto/create-room.dto.js';
 import { SendMessageDto } from './dto/send-message.dto.js';
 
 @Injectable()
 export class SocialService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly redis: RedisService) {}
 
   async rooms(userId: string) {
     return this.prisma.socialRoom.findMany({
@@ -22,6 +23,7 @@ export class SocialService {
   }
 
   async create(userId: string, dto: CreateRoomDto) {
+    await this.enforceLimit(`social:create:${userId}`, 10, 3600);
     const name = dto.name.trim();
     if (!name) throw new BadRequestException('Room name is required');
     return this.prisma.socialRoom.create({
@@ -49,6 +51,7 @@ export class SocialService {
   }
 
   async join(id: string, userId: string) {
+    await this.enforceLimit(`social:join:${userId}`, 60, 600);
     const room = await this.prisma.socialRoom.findUnique({
       where: { id },
       include: { members: { select: { userId: true } }, _count: { select: { members: true } } },
@@ -93,6 +96,7 @@ export class SocialService {
   }
 
   async sendMessage(id: string, userId: string, dto: SendMessageDto) {
+    await this.enforceLimit(`social:message:${userId}`, 80, 60);
     await this.ensureMember(id, userId);
     const text = dto.text.trim();
     if (!text) throw new BadRequestException('Message is empty');
@@ -104,6 +108,7 @@ export class SocialService {
   }
 
   async voiceSession(id: string, userId: string) {
+    await this.enforceLimit(`social:voice:${userId}`, 20, 60);
     const room = await this.ensureMember(id, userId);
     if (room.type !== SocialRoomType.VOICE) throw new BadRequestException('This is not a voice room');
     const endpoint = process.env.VOICE_TOKEN_ENDPOINT;
@@ -115,6 +120,7 @@ export class SocialService {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { profile: true } });
     const response = await fetch(endpoint, {
       method: 'POST',
+      signal: AbortSignal.timeout(8000),
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ roomId: room.voiceProviderRoom ?? room.id, userId, displayName: user?.profile?.displayName ?? user?.username ?? userId, provider }),
     });
@@ -129,5 +135,10 @@ export class SocialService {
     const member = await this.prisma.socialRoomMember.findUnique({ where: { roomId_userId: { roomId: id, userId } } });
     if (!member) throw new ForbiddenException('Join the room first');
     return room;
+  }
+
+  private async enforceLimit(key: string, limit: number, seconds: number) {
+    const result = await this.redis.rateLimit(key, limit, seconds);
+    if (!result.allowed) throw new HttpException(`Too many requests. Try again in ${result.retryAfter} seconds.`, 429);
   }
 }

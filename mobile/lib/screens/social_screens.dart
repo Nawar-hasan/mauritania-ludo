@@ -65,8 +65,3 @@ class _VoiceRoomScreenState extends State<VoiceRoomScreen>{
     ]))));
   }
 }
-
-class TournamentsScreen extends StatelessWidget { const TournamentsScreen({super.key}); @override Widget build(BuildContext context)=>const AppPage(title:'Tournaments',child:EmptyState(icon:Icons.emoji_events_outlined,title:'Tournaments',message:'Tournament gameplay is separate from the wager and offline finalization patch.')); }
-class TournamentDetailsScreen extends StatelessWidget { const TournamentDetailsScreen({super.key}); @override Widget build(BuildContext context)=>const AppPage(title:'Tournament details',child:EmptyState(icon:Icons.emoji_events_outlined,title:'Tournament details',message:'No tournament selected.')); }
-class BracketScreen extends StatelessWidget { const BracketScreen({super.key}); @override Widget build(BuildContext context)=>const AppPage(title:'Tournament bracket',child:EmptyState(icon:Icons.account_tree_outlined,title:'Bracket',message:'No bracket selected.')); }
-class LeaderboardScreen extends StatelessWidget { const LeaderboardScreen({super.key}); @override Widget build(BuildContext context)=>const AppPage(title:'Leaderboard',child:EmptyState(icon:Icons.leaderboard_outlined,title:'Leaderboard',message:'Rankings will be connected in the tournament module.')); }

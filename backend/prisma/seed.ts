@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import argon2 from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { CatalogItemType, CatalogRarity, CatalogStatus, CampaignSurface, PaymentMethodStatus, PaymentProvider, PrismaClient, Role, WalletType } from '../src/generated/prisma/client.js';
+import { AchievementMetric, CatalogItemType, CatalogRarity, CatalogStatus, CampaignSurface, PaymentMethodStatus, PaymentProvider, PrismaClient, Role, WalletType } from '../src/generated/prisma/client.js';
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error('DATABASE_URL is required');
@@ -24,12 +24,18 @@ async function main() {
     ['minimum_wager', 50, 'Minimum wager amount', true],
     ['maximum_wager', 100000, 'Maximum wager amount', true],
     ['real_money_enabled', false, 'Must remain false until compliance approval', true],
+    ['money_test_mode', false, 'Allows deposit/withdrawal flow testing with non-production funds only', true],
     ['maintenance_mode', false, 'Blocks new matches when enabled', true],
     ['minimum_withdrawal', 300, 'Minimum withdrawal request amount', true],
     ['maximum_withdrawal', 100000, 'Maximum withdrawal request amount', true],
     ['deposit_account', '', 'Administration transfer account shown in the mobile application', true],
     ['deposit_instructions', '', 'Transfer instructions shown before receipt submission', true],
     ['support_email', '', 'Public support email configured by administration', true],
+    ['wager_test_mode', false, 'Allows staged wager testing while real_money_enabled remains false', true],
+    ['kyc_required_for_wager', true, 'Require verified identity when real money is enabled for wagering', true],
+    ['kyc_required_for_deposit', true, 'Require verified identity when real money is enabled for deposits', true],
+    ['kyc_required_for_withdrawal', true, 'Require verified identity when real money is enabled for withdrawals', true],
+    ['referral_reward_coins', 100, 'Coins granted to inviter and invited player after a valid referral', true],
   ] as const;
   for (const [key, value, description, isPublic] of settings) {
     await prisma.appSetting.upsert({ where: { key }, update: overwriteDefaults ? { value, description, isPublic } : {}, create: { key, value, description, isPublic } });
@@ -84,6 +90,18 @@ async function main() {
   ];
   for (const method of paymentMethods) {
     await prisma.paymentMethod.upsert({ where: { code: method.code }, update: overwriteDefaults ? method : {}, create: method });
+  }
+
+  const achievements = [
+    { code: 'FIRST_MATCH', titleAr: 'البداية', titleEn: 'First Match', descriptionAr: 'أكمل أول مباراة متصلة.', descriptionEn: 'Complete your first online match.', metric: AchievementMetric.MATCHES, target: 1, rewardCoins: 50, rewardGems: 0, sortOrder: 1 },
+    { code: 'TEN_MATCHES', titleAr: 'لاعب نشيط', titleEn: 'Active Player', descriptionAr: 'أكمل 10 مباريات.', descriptionEn: 'Complete 10 matches.', metric: AchievementMetric.MATCHES, target: 10, rewardCoins: 150, rewardGems: 0, sortOrder: 2 },
+    { code: 'FIRST_WIN', titleAr: 'أول انتصار', titleEn: 'First Win', descriptionAr: 'حقق أول فوز.', descriptionEn: 'Win your first match.', metric: AchievementMetric.WINS, target: 1, rewardCoins: 75, rewardGems: 0, sortOrder: 3 },
+    { code: 'TEN_WINS', titleAr: 'منافس قوي', titleEn: 'Strong Competitor', descriptionAr: 'حقق 10 انتصارات.', descriptionEn: 'Win 10 matches.', metric: AchievementMetric.WINS, target: 10, rewardCoins: 250, rewardGems: 5, sortOrder: 4 },
+    { code: 'LEVEL_FIVE', titleAr: 'بطل صاعد', titleEn: 'Rising Champion', descriptionAr: 'صل إلى المستوى 5.', descriptionEn: 'Reach level 5.', metric: AchievementMetric.LEVEL, target: 5, rewardCoins: 300, rewardGems: 10, sortOrder: 5 },
+    { code: 'XP_2000', titleAr: 'خبير لودو', titleEn: 'Ludo Veteran', descriptionAr: 'اجمع 2000 نقطة خبرة.', descriptionEn: 'Earn 2000 XP.', metric: AchievementMetric.XP, target: 2000, rewardCoins: 500, rewardGems: 15, sortOrder: 6 },
+  ];
+  for (const achievement of achievements) {
+    await prisma.achievementDefinition.upsert({ where: { code: achievement.code }, update: overwriteDefaults ? achievement : {}, create: achievement });
   }
 
   const email = process.env.SEED_ADMIN_EMAIL;

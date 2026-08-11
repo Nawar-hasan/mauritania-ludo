@@ -205,6 +205,54 @@ enum NotificationType {
   SOCIAL
 }
 
+
+
+enum IdentityVerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum AchievementMetric {
+  MATCHES
+  WINS
+  LEVEL
+  XP
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_USER
+  RESOLVED
+  CLOSED
+}
+
+enum TournamentStatus {
+  DRAFT
+  OPEN
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum TournamentEntryStatus {
+  REGISTERED
+  ACTIVE
+  ELIMINATED
+  WINNER
+  WITHDRAWN
+}
+
+enum TournamentPairingStatus {
+  PENDING
+  READY
+  ACTIVE
+  COMPLETED
+  BYE
+  CANCELLED
+}
 model User {
   id              String           @id @default(uuid()) @db.Uuid
   email           String?          @unique
@@ -214,6 +262,8 @@ model User {
   status          UserStatus       @default(ACTIVE)
   roles           Role[]           @default([PLAYER])
   preferredLocale String           @default("ar")
+  acceptedTermsAt DateTime?
+  termsVersion    String?
   lastLoginAt     DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -232,6 +282,20 @@ model User {
   socialRoomsOwned SocialRoom[]       @relation("SocialRoomOwner")
   socialMemberships SocialRoomMember[]
   socialMessages    SocialMessage[]
+  passwordResetRequests PasswordResetRequest[]
+  privacySetting        UserPrivacySetting?
+  identityVerification  IdentityVerification? @relation("IdentitySubject")
+  identityReviews       IdentityVerification[] @relation("IdentityReviewer")
+  userAchievements      UserAchievement[]
+  referralProfile       ReferralProfile?
+  referralsSent         Referral[] @relation("ReferralReferrer")
+  referralReceived      Referral?  @relation("ReferralReferred")
+  supportTickets        SupportTicket[]
+  supportMessages       SupportMessage[]
+  tournamentEntries     TournamentEntry[]
+  tournamentPairingsA   TournamentPairing[] @relation("TournamentPlayerA")
+  tournamentPairingsB   TournamentPairing[] @relation("TournamentPlayerB")
+  tournamentWins        TournamentPairing[] @relation("TournamentWinner")
   adminActions    AuditLog[]       @relation("AdminActor")
 
   @@index([status])
@@ -382,6 +446,7 @@ model Match {
   players         MatchPlayer[]
   events          MatchEvent[]
   tickets         MatchmakingTicket[]
+  tournamentPairings TournamentPairing[]
 
   @@index([status, nextActionAt])
   @@index([mode, status, createdAt])
@@ -677,15 +742,21 @@ model Notification {
 }
 
 model UploadedFile {
-  id           String   @id @default(uuid()) @db.Uuid
-  userId       String   @db.Uuid
-  storageKey   String   @unique
-  originalName String
-  mimeType     String
-  sizeBytes    Int
-  publicUrl    String
-  createdAt    DateTime @default(now())
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                       String   @id @default(uuid()) @db.Uuid
+  userId                   String   @db.Uuid
+  storageKey               String   @unique
+  originalName             String
+  mimeType                 String
+  sizeBytes                Int
+  publicUrl                String
+  isPrivate                Boolean  @default(false)
+  createdAt                DateTime @default(now())
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  identityDocumentFrontFor IdentityVerification[] @relation("IdentityDocumentFront")
+  identityDocumentBackFor  IdentityVerification[] @relation("IdentityDocumentBack")
+  identitySelfieFor        IdentityVerification[] @relation("IdentitySelfie")
+
+  @@index([userId, isPrivate, createdAt])
 }
 
 model AuditLog {
@@ -703,4 +774,211 @@ model AuditLog {
 
   @@index([actorUserId, createdAt])
   @@index([entityType, entityId])
+}
+
+model PasswordResetRequest {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @db.Uuid
+  codeHash        String
+  resetTokenHash  String?
+  destination     String?
+  expiresAt       DateTime
+  verifiedAt      DateTime?
+  consumedAt      DateTime?
+  attempts        Int      @default(0)
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([expiresAt, consumedAt])
+}
+
+model UserPrivacySetting {
+  userId              String   @id @db.Uuid
+  showOnlineStatus    Boolean  @default(true)
+  allowDirectMessages Boolean  @default(true)
+  allowInvites        Boolean  @default(true)
+  updatedAt           DateTime @updatedAt
+  createdAt           DateTime @default(now())
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model IdentityVerification {
+  userId              String                     @id @db.Uuid
+  status              IdentityVerificationStatus @default(UNVERIFIED)
+  legalName           String?
+  dateOfBirth         DateTime?
+  countryCode         String?
+  documentFrontFileId String?                    @db.Uuid
+  documentBackFileId  String?                    @db.Uuid
+  selfieFileId        String?                    @db.Uuid
+  note                String?
+  reviewedBy          String?                    @db.Uuid
+  reviewedAt          DateTime?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+  user                User                       @relation("IdentitySubject", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer            User?                      @relation("IdentityReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  documentFront       UploadedFile?              @relation("IdentityDocumentFront", fields: [documentFrontFileId], references: [id], onDelete: SetNull)
+  documentBack        UploadedFile?              @relation("IdentityDocumentBack", fields: [documentBackFileId], references: [id], onDelete: SetNull)
+  selfie              UploadedFile?              @relation("IdentitySelfie", fields: [selfieFileId], references: [id], onDelete: SetNull)
+
+  @@index([status, updatedAt])
+  @@index([documentFrontFileId])
+  @@index([documentBackFileId])
+  @@index([selfieFileId])
+}
+
+model AchievementDefinition {
+  id          String            @id @default(uuid()) @db.Uuid
+  code        String            @unique
+  titleAr     String
+  titleEn     String
+  descriptionAr String?
+  descriptionEn String?
+  metric      AchievementMetric
+  target      Int
+  rewardCoins Int               @default(0)
+  rewardGems  Int               @default(0)
+  iconUrl     String?
+  sortOrder   Int               @default(0)
+  enabled     Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  users       UserAchievement[]
+
+  @@index([enabled, sortOrder])
+}
+
+model UserAchievement {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @db.Uuid
+  achievementId String   @db.Uuid
+  claimedAt     DateTime?
+  createdAt     DateTime @default(now())
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   AchievementDefinition @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId, claimedAt])
+}
+
+model ReferralProfile {
+  userId    String   @id @db.Uuid
+  code      String   @unique
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Referral {
+  id             String   @id @default(uuid()) @db.Uuid
+  referrerUserId String   @db.Uuid
+  referredUserId String   @unique @db.Uuid
+  code           String
+  rewardedAt     DateTime?
+  createdAt      DateTime @default(now())
+  referrer       User     @relation("ReferralReferrer", fields: [referrerUserId], references: [id], onDelete: Cascade)
+  referred       User     @relation("ReferralReferred", fields: [referredUserId], references: [id], onDelete: Cascade)
+
+  @@index([referrerUserId, createdAt])
+  @@index([code])
+}
+
+model SupportTicket {
+  id            String              @id @default(uuid()) @db.Uuid
+  userId        String              @db.Uuid
+  subject       String
+  category      String
+  priority      Int                 @default(2)
+  status        SupportTicketStatus @default(OPEN)
+  lastMessageAt DateTime            @default(now())
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages      SupportMessage[]
+
+  @@index([userId, updatedAt])
+  @@index([status, lastMessageAt])
+}
+
+model SupportMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  ticketId  String   @db.Uuid
+  userId    String?  @db.Uuid
+  isStaff   Boolean  @default(false)
+  text      String
+  createdAt DateTime @default(now())
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+}
+
+model Tournament {
+  id                    String           @id @default(uuid()) @db.Uuid
+  code                  String           @unique
+  nameAr                String
+  nameEn                String
+  descriptionAr         String?
+  descriptionEn         String?
+  imageUrl              String?
+  status                TournamentStatus @default(DRAFT)
+  ruleCode              String           @default("CLASSIC")
+  matchPlayers          Int              @default(2)
+  minPlayers            Int              @default(2)
+  maxPlayers            Int              @default(16)
+  entryFee              Decimal          @default(0) @db.Decimal(20, 4)
+  prizePool             Decimal          @default(0) @db.Decimal(20, 4)
+  currency              String           @default("MRU")
+  registrationOpensAt   DateTime?
+  registrationClosesAt  DateTime?
+  startsAt              DateTime?
+  completedAt           DateTime?
+  sortOrder             Int              @default(0)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  entries               TournamentEntry[]
+  pairings              TournamentPairing[]
+
+  @@index([status, startsAt, sortOrder])
+}
+
+model TournamentEntry {
+  id           String                @id @default(uuid()) @db.Uuid
+  tournamentId String                @db.Uuid
+  userId       String                @db.Uuid
+  seed         Int?
+  status       TournamentEntryStatus @default(REGISTERED)
+  placement    Int?
+  joinedAt     DateTime              @default(now())
+  eliminatedAt DateTime?
+  tournament    Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+  @@index([tournamentId, status, seed])
+  @@index([userId, joinedAt])
+}
+
+model TournamentPairing {
+  id            String                  @id @default(uuid()) @db.Uuid
+  tournamentId  String                  @db.Uuid
+  roundNumber   Int
+  position      Int
+  playerAUserId String?                 @db.Uuid
+  playerBUserId String?                 @db.Uuid
+  winnerUserId  String?                 @db.Uuid
+  matchId       String?                 @db.Uuid
+  status        TournamentPairingStatus @default(PENDING)
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  tournament    Tournament              @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  playerA       User?                   @relation("TournamentPlayerA", fields: [playerAUserId], references: [id], onDelete: SetNull)
+  playerB       User?                   @relation("TournamentPlayerB", fields: [playerBUserId], references: [id], onDelete: SetNull)
+  winner        User?                   @relation("TournamentWinner", fields: [winnerUserId], references: [id], onDelete: SetNull)
+  match         Match?                  @relation(fields: [matchId], references: [id], onDelete: SetNull)
+
+  @@unique([tournamentId, roundNumber, position])
+  @@index([tournamentId, roundNumber, status])
+  @@index([matchId])
 }

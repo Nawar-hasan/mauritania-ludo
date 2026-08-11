@@ -218,7 +218,45 @@ class _LocalLudoGameScreenState extends State<LocalLudoGameScreen> {
           Padding(padding: const EdgeInsets.fromLTRB(14, 6, 14, 14), child: Column(children: [
             Text(context.tr(_finished ? 'Practice completed' : humanTurn ? (_dice == null ? 'Your turn — roll the dice' : 'Choose a highlighted piece') : "Computer's turn"), style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.gold)),
             const SizedBox(height: 8),
-            GestureDetector(onTap: humanTurn && _dice == null ? _roll : null, child: AnimatedContainer(duration: const Duration(milliseconds: 180), width: 82, height: 82, decoration: BoxDecoration(gradient: humanTurn ? AppGradients.gold : AppGradients.purple, borderRadius: BorderRadius.circular(24)), child: Center(child: _dice == null ? Icon(humanTurn ? Icons.casino_rounded : Icons.smart_toy_rounded, color: AppColors.background2, size: 42) : Text('$_dice', style: const TextStyle(color: AppColors.background2, fontSize: 34, fontWeight: FontWeight.w900))))),
+            GestureDetector(
+              onTap: humanTurn && _dice == null ? _roll : null,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 82,
+                height: 82,
+                decoration: BoxDecoration(
+                  gradient: humanTurn ? AppGradients.gold : AppGradients.purple,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Center(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 280),
+                    transitionBuilder: (child, animation) => RotationTransition(
+                      turns: Tween<double>(begin: -.15, end: 0).animate(
+                        CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+                      ),
+                      child: ScaleTransition(scale: animation, child: child),
+                    ),
+                    child: _dice == null
+                        ? Icon(
+                            humanTurn ? Icons.casino_rounded : Icons.smart_toy_rounded,
+                            key: ValueKey('ready-$humanTurn'),
+                            color: AppColors.background2,
+                            size: 42,
+                          )
+                        : Text(
+                            '$_dice',
+                            key: ValueKey('dice-$_dice'),
+                            style: const TextStyle(
+                              color: AppColors.background2,
+                              fontSize: 34,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 7),
             Text(context.tr(_dice == null ? (humanTurn ? 'Tap the dice' : 'Computer is thinking...') : 'Tap a highlighted piece on the board'), style: const TextStyle(color: AppColors.muted, fontSize: 10)),
           ])),

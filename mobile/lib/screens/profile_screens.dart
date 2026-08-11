@@ -67,7 +67,8 @@ class ProfileScreen extends StatelessWidget {
           OptionTile(icon: Icons.analytics_outlined, title: 'Statistics', subtitle: 'Real profile statistics returned by the server', onTap: () => Navigator.pushNamed(context, Routes.stats)),
           OptionTile(icon: Icons.history_rounded, title: 'Match history', subtitle: 'Matches stored in the backend', onTap: () => Navigator.pushNamed(context, Routes.matchHistory)),
           OptionTile(icon: Icons.inventory_2_outlined, title: 'Inventory', subtitle: 'Owned boards, dice, frames, backgrounds and special items', onTap: () => Navigator.pushNamed(context, Routes.inventory)),
-          OptionTile(icon: Icons.military_tech_outlined, title: 'Achievements', subtitle: 'This module has no real server data yet', onTap: () => Navigator.pushNamed(context, Routes.achievements)),
+          OptionTile(icon: Icons.military_tech_outlined, title: 'Achievements', subtitle: 'Progress, rewards and claimed achievements', onTap: () => Navigator.pushNamed(context, Routes.achievements)),
+          OptionTile(icon: Icons.group_add_outlined, title: 'Invite friends', subtitle: 'Share your referral code and track invited players', onTap: () => Navigator.pushNamed(context, Routes.referrals)),
           OptionTile(icon: Icons.settings_outlined, title: 'Account settings', subtitle: 'Language, sound, privacy and account controls', onTap: () => Navigator.pushNamed(context, Routes.accountSettings)),
           OptionTile(icon: Icons.logout_rounded, title: 'Log out', subtitle: 'End the current authenticated session', color: AppColors.red, onTap: () => _logout(context)),
         ],
@@ -224,26 +225,15 @@ class InventoryScreen extends StatelessWidget {
   }
 }
 
-class AchievementsScreen extends StatelessWidget {
-  const AchievementsScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const AppPage(title: 'Achievements', child: EmptyState(icon: Icons.military_tech_outlined, title: 'Achievements are not connected yet', message: 'Achievements will be calculated and granted by the backend.'));
-}
-
-class ReferralsScreen extends StatelessWidget {
-  const ReferralsScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const AppPage(title: 'Invite friends', child: EmptyState(icon: Icons.group_add_outlined, title: 'Referral system is not connected yet', message: 'No local referral codes or rewards are generated in this build.'));
-}
-
 class AccountSettingsScreen extends StatelessWidget {
   const AccountSettingsScreen({super.key});
   @override
   Widget build(BuildContext context) => AppPage(title: 'Account settings', child: Column(children: [
     OptionTile(icon: Icons.language_rounded, title: 'Language', subtitle: 'Switch the whole application between Arabic and English', onTap: () => _language(context)),
-    OptionTile(icon: Icons.volume_up_outlined, title: 'Sound', subtitle: 'Music, effects and vibration', onTap: () => Navigator.pushNamed(context, Routes.soundSettings)),
-    OptionTile(icon: Icons.privacy_tip_outlined, title: 'Privacy', subtitle: 'Social privacy options will be sent to the backend later', onTap: () => Navigator.pushNamed(context, Routes.privacySettings)),
-    OptionTile(icon: Icons.support_agent_rounded, title: 'Support', subtitle: 'Support module status', onTap: () => Navigator.pushNamed(context, Routes.support)),
+    OptionTile(icon: Icons.volume_up_outlined, title: 'Sound', subtitle: 'Interface sound and vibration feedback', onTap: () => Navigator.pushNamed(context, Routes.soundSettings)),
+    OptionTile(icon: Icons.privacy_tip_outlined, title: 'Privacy', subtitle: 'Server-stored privacy preferences for social features', onTap: () => Navigator.pushNamed(context, Routes.privacySettings)),
+    OptionTile(icon: Icons.verified_user_outlined, title: 'Identity & age verification', subtitle: 'Verification status for protected money features', onTap: () => Navigator.pushNamed(context, Routes.identityVerification)),
+    OptionTile(icon: Icons.support_agent_rounded, title: 'Support', subtitle: 'Create tickets and follow support replies', onTap: () => Navigator.pushNamed(context, Routes.support)),
     OptionTile(icon: Icons.info_outline_rounded, title: 'About', subtitle: 'Application and environment information', onTap: () => Navigator.pushNamed(context, Routes.about)),
   ]));
 
@@ -256,22 +246,6 @@ class AccountSettingsScreen extends StatelessWidget {
   }
 }
 
-class PrivacySettingsScreen extends StatefulWidget {
-  const PrivacySettingsScreen({super.key});
-  @override
-  State<PrivacySettingsScreen> createState() => _PrivacySettingsScreenState();
-}
-class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
-  bool online = true, messages = true, invites = true;
-  @override
-  Widget build(BuildContext context) => AppPage(title: 'Privacy', child: Column(children: [
-    SwitchListTile(value: online, activeThumbColor: AppColors.gold, onChanged: (v) => setState(() => online = v), title: Text(context.tr('Show online status'))),
-    SwitchListTile(value: messages, activeThumbColor: AppColors.gold, onChanged: (v) => setState(() => messages = v), title: Text(context.tr('Allow direct messages'))),
-    SwitchListTile(value: invites, activeThumbColor: AppColors.gold, onChanged: (v) => setState(() => invites = v), title: Text(context.tr('Allow friend invitations'))),
-    const EmptyState(icon: Icons.info_outline_rounded, title: 'Not synchronized yet', message: 'These social settings remain on this screen only until the social profile backend is added.'),
-  ]));
-}
-
 class SoundSettingsScreen extends StatefulWidget {
   const SoundSettingsScreen({super.key});
   @override
@@ -282,17 +256,24 @@ class _SoundSettingsScreenState extends State<SoundSettingsScreen> {
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
     return AppPage(title: 'Sound', child: Column(children: [
-      SwitchListTile(value: controller.musicEnabled, activeThumbColor: AppColors.gold, onChanged: (v) { controller.toggleMusic(v); setState(() {}); }, title: Text(context.tr('Music'))),
-      SwitchListTile(value: controller.effectsEnabled, activeThumbColor: AppColors.gold, onChanged: (v) { controller.toggleEffects(v); setState(() {}); }, title: Text(context.tr('Sound effects'))),
-      SwitchListTile(value: controller.vibrationEnabled, activeThumbColor: AppColors.gold, onChanged: (v) { controller.toggleVibration(v); setState(() {}); }, title: Text(context.tr('Vibration'))),
+      GradientPanel(child: Column(children: [
+        SwitchListTile(
+          value: controller.effectsEnabled,
+          activeThumbColor: AppColors.gold,
+          onChanged: (v) async { await controller.toggleEffects(v); if (mounted) setState(() {}); },
+          title: Text(context.tr('Interface sound')),
+          subtitle: Text(context.tr('Use the system click sound on primary interactions.')),
+        ),
+        SwitchListTile(
+          value: controller.vibrationEnabled,
+          activeThumbColor: AppColors.gold,
+          onChanged: (v) async { await controller.toggleVibration(v); if (mounted) setState(() {}); },
+          title: Text(context.tr('Vibration')),
+          subtitle: Text(context.tr('Use haptic feedback on primary interactions.')),
+        ),
+      ])),
     ]));
   }
-}
-
-class SupportScreen extends StatelessWidget {
-  const SupportScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const AppPage(title: 'Support', child: EmptyState(icon: Icons.support_agent_rounded, title: 'Support tickets are not connected yet', message: 'No fake tickets are created. This module will be connected after the core game test succeeds.'));
 }
 
 class AboutScreen extends StatelessWidget {
@@ -301,7 +282,7 @@ class AboutScreen extends StatelessWidget {
   Widget build(BuildContext context) => AppPage(title: 'About', child: Column(children: [
     const ScreenHeader(title: 'MAURITANIA LUDO', subtitle: 'Connected staging build', icon: Icons.casino_rounded),
     const SizedBox(height: 18),
-    GradientPanel(child: Text(context.tr('This build uses real authentication, profile, wallet, payments, store, inventory, appearance, levels, stages, transactions, authoritative online matches, cash-wager reservation/settlement, offline practice and server-backed text/voice room structure. Live voice audio still requires the selected voice provider API. Tournaments, referrals, achievements, support and password recovery remain separate modules.'), textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, height: 1.5))),
+    GradientPanel(child: Text(context.tr('This release connects authentication and recovery, profile, wallet, payments, store, inventory, appearance, levels, stages, transactions, authoritative online matches, wager reservation and settlement, offline practice, social rooms, tournaments, leaderboard, referrals, achievements, privacy, identity review and support tickets. Live voice audio and automatic payment processing activate through their selected provider APIs.'), textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, height: 1.5))),
   ]));
 }
 

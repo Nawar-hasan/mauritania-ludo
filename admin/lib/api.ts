@@ -65,3 +65,33 @@ export function assetUrl(raw?: string | null) {
   const root = BASE.endsWith('/api/v1') ? BASE.slice(0, -7) : BASE;
   return value.startsWith('/') ? `${root}${value}` : `${root}/${value}`;
 }
+
+
+export async function openAuthenticatedFile(rawUrl: string) {
+  if (typeof window === 'undefined') return;
+  const baseUrl = new URL(BASE);
+  const target = new URL(rawUrl, baseUrl.origin);
+  const apiRoot = baseUrl.pathname.replace(/\/$/, '');
+  if (target.origin !== baseUrl.origin || !target.pathname.startsWith(`${apiRoot}/files/`)) {
+    throw new Error('Blocked an invalid protected-file URL');
+  }
+
+  async function fetchProtected(allowRefresh: boolean): Promise<Response> {
+    const token = getToken();
+    const response = await safeFetch(target.toString(), { headers: token ? { Authorization: `Bearer ${token}` } : {} }, 30000);
+    if (response.status === 401 && allowRefresh && await refreshAccessToken()) return fetchProtected(false);
+    if (response.status === 401) {
+      localStorage.removeItem('admin_access_token');
+      localStorage.removeItem('admin_refresh_token');
+      window.location.href = '/login';
+    }
+    return response;
+  }
+
+  const response = await fetchProtected(true);
+  if (!response.ok) throw new Error(`Unable to open protected file (${response.status})`);
+  const blobUrl = URL.createObjectURL(await response.blob());
+  const popup = window.open(blobUrl, '_blank', 'noopener,noreferrer');
+  if (!popup) { URL.revokeObjectURL(blobUrl); throw new Error('The browser blocked the file window'); }
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+}

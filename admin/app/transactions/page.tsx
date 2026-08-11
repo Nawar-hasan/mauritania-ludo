@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Shell } from '@/components/shell';
-import { api } from '@/lib/api';
+import { api, openAuthenticatedFile } from '@/lib/api';
 
 export default function Transactions() {
   const [items, setItems] = useState<any[]>([]);
@@ -44,7 +44,7 @@ export default function Transactions() {
         <td>{transaction.amount} {transaction.currency}</td>
         <td style={{minWidth:240}}>
           {transaction.externalRef && <div>Reference: {transaction.externalRef}</div>}
-          {metadata.receiptUrl && <div><a href={metadata.receiptUrl} target="_blank" rel="noreferrer" style={{color:'var(--gold)'}}>Open receipt image</a></div>}
+          {metadata.receiptUrl && <div><button className="btn secondary" onClick={()=>openAuthenticatedFile(metadata.receiptUrl).catch((e:any)=>setMessage(e.message))}>Open receipt image</button></div>}
           {metadata.accountNumber && <div>Account: {metadata.accountNumber}</div>}
           {metadata.accountName && <div>Name: {metadata.accountName}</div>}
           {metadata.note && <div>Note: {metadata.note}</div>}

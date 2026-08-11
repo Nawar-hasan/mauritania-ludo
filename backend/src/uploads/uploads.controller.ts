@@ -13,15 +13,22 @@ export class UploadsController {
 
   @Post('avatar')
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { files: 1, fileSize: Number(process.env.MAX_UPLOAD_BYTES ?? 5_242_880) } }))
   uploadAvatar(@CurrentUser() user: AuthUser, @UploadedFile() file: Express.Multer.File) {
     return this.uploads.avatar(user.sub, file);
   }
 
   @Post('receipt')
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { files: 1, fileSize: Number(process.env.MAX_UPLOAD_BYTES ?? 5_242_880) } }))
   uploadReceipt(@CurrentUser() user: AuthUser, @UploadedFile() file: Express.Multer.File) {
     return this.uploads.receipt(user.sub, file);
+  }
+
+  @Post('identity-document')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { limits: { files: 1, fileSize: Number(process.env.MAX_UPLOAD_BYTES ?? 5_242_880) } }))
+  uploadIdentityDocument(@CurrentUser() user: AuthUser, @UploadedFile() file: Express.Multer.File) {
+    return this.uploads.identityDocument(user.sub, file);
   }
 }

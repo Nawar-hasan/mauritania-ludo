@@ -174,9 +174,10 @@ class _ReceiptUploadScreenState extends State<ReceiptUploadScreen> {
   Future<void> _submit(Map<String, dynamic> args) async {
     final controller = AppScope.of(context);
     if (receipt == null) { _message(context, 'Select the transfer receipt'); return; }
-    final url = await controller.uploadReceiptBytes(await receipt!.readAsBytes(), receipt!.name);
-    if (url == null || !mounted) { _message(context, controller.errorMessage ?? 'Receipt upload failed'); return; }
-    final result = await controller.createPaymentIntent(methodCode: '${args['methodCode'] ?? ''}', amount: _num(args['amount']), externalRef: reference.text.trim(), receiptUrl: url);
+    final uploaded = await controller.uploadReceiptBytes(await receipt!.readAsBytes(), receipt!.name);
+    final fileId = uploaded?['fileId']?.toString() ?? '';
+    if (fileId.isEmpty || !mounted) { _message(context, controller.errorMessage ?? 'Receipt upload failed'); return; }
+    final result = await controller.createPaymentIntent(methodCode: '${args['methodCode'] ?? ''}', amount: _num(args['amount']), externalRef: reference.text.trim(), receiptFileId: fileId);
     if (!mounted) return;
     if (result != null) Navigator.pushNamedAndRemoveUntil(context, Routes.depositSuccess, (route) => route.settings.name == Routes.shell || route.isFirst);
     else _message(context, controller.errorMessage ?? 'Deposit request failed');

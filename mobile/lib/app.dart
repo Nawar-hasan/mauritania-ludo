@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'core/app_controller.dart';
 import 'core/app_theme.dart';
 import 'core/routes.dart';
+import 'core/motion.dart';
 import 'screens/auth_screens.dart';
 import 'screens/game_screens.dart';
+import 'screens/final_product_screens.dart';
 import 'screens/local_game_screen.dart';
 import 'screens/remote_game_screen.dart';
 import 'screens/home_screens.dart';
@@ -62,10 +64,10 @@ class _LudoChampionAppState extends State<LudoChampionApp> {
       Routes.language => const LanguageScreen(),
       Routes.login => const LoginScreen(),
       Routes.register => const RegisterScreen(),
-      Routes.forgotPassword => const ForgotPasswordScreen(),
-      Routes.otp => const OtpScreen(),
-      Routes.resetPassword => const ResetPasswordScreen(),
-      Routes.resetSuccess => const ResetSuccessScreen(),
+      Routes.forgotPassword => const FinalForgotPasswordScreen(),
+      Routes.otp => FinalOtpScreen(requestId: '${((settings.arguments as Map?)?['requestId'] ?? '')}', destination: '${((settings.arguments as Map?)?['destination'] ?? '')}'),
+      Routes.resetPassword => FinalResetPasswordScreen(requestId: '${((settings.arguments as Map?)?['requestId'] ?? '')}', resetToken: '${((settings.arguments as Map?)?['resetToken'] ?? '')}'),
+      Routes.resetSuccess => const FinalResetSuccessScreen(),
       Routes.terms => const TermsScreen(),
       Routes.shell => const MainShellScreen(),
       Routes.notifications => const NotificationsScreen(),
@@ -102,10 +104,10 @@ class _LudoChampionAppState extends State<LudoChampionApp> {
       Routes.transactionDetails => const TransactionDetailsScreen(),
       Routes.store => const StoreScreen(),
       Routes.purchaseSuccess => const PurchaseSuccessScreen(),
-      Routes.tournaments => const TournamentsScreen(),
-      Routes.tournamentDetails => const TournamentDetailsScreen(),
-      Routes.bracket => const BracketScreen(),
-      Routes.leaderboard => const LeaderboardScreen(),
+      Routes.tournaments => const FinalTournamentsScreen(),
+      Routes.tournamentDetails => FinalTournamentDetailsScreen(id: '${((settings.arguments as Map?)?['id'] ?? '')}'),
+      Routes.bracket => FinalBracketScreen(id: '${((settings.arguments as Map?)?['id'] ?? '')}'),
+      Routes.leaderboard => const FinalLeaderboardScreen(),
       Routes.rooms => const RoomsScreen(),
       Routes.createVoiceRoom => const CreateVoiceRoomScreen(),
       Routes.voiceRoom => const VoiceRoomScreen(),
@@ -114,17 +116,17 @@ class _LudoChampionAppState extends State<LudoChampionApp> {
       Routes.stats => const StatsScreen(),
       Routes.matchHistory => const MatchHistoryScreen(),
       Routes.inventory => const InventoryScreen(),
-      Routes.achievements => const AchievementsScreen(),
-      Routes.referrals => const ReferralsScreen(),
+      Routes.achievements => const FinalAchievementsScreen(),
+      Routes.referrals => const FinalReferralsScreen(),
       Routes.accountSettings => const AccountSettingsScreen(),
-      Routes.privacySettings => const PrivacySettingsScreen(),
+      Routes.privacySettings => const FinalPrivacySettingsScreen(),
       Routes.soundSettings => const SoundSettingsScreen(),
-      Routes.support => const SupportScreen(),
+      Routes.support => const FinalSupportScreen(),
+      Routes.identityVerification => const FinalIdentityScreen(),
       Routes.about => const AboutScreen(),
-      Routes.catalog => const ScreenCatalogScreen(),
       _ => const MainShellScreen(),
     };
 
-    return MaterialPageRoute<void>(builder: (_) => screen, settings: settings);
+    return AppMotion.route<void>(screen, settings);
   }
 }

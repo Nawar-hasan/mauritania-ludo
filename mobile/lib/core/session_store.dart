@@ -6,6 +6,8 @@ class SessionStore {
   static const _refreshKey = 'refresh_token';
   static const _localeKey = 'locale';
   static const _onboardingKey = 'onboarding_completed';
+  static const _effectsKey = 'sound_effects_enabled';
+  static const _vibrationKey = 'vibration_enabled';
 
   final FlutterSecureStorage _secure = const FlutterSecureStorage();
 
@@ -40,5 +42,25 @@ class SessionStore {
   Future<void> completeOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_onboardingKey, true);
+  }
+
+  Future<bool> getEffectsEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_effectsKey) ?? true;
+  }
+
+  Future<void> setEffectsEnabled(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_effectsKey, value);
+  }
+
+  Future<bool> getVibrationEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_vibrationKey) ?? true;
+  }
+
+  Future<void> setVibrationEnabled(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_vibrationKey, value);
   }
 }
